@@ -8,6 +8,17 @@ table! {
 }
 
 table! {
+    announcements (id) {
+        id -> Int4,
+        title -> Text,
+        author -> Text,
+        contents -> Text,
+        release_time -> Nullable<Timestamp>,
+        last_update_time -> Timestamp,
+    }
+}
+
+table! {
     contests (region) {
         region -> Text,
         title -> Text,
@@ -106,6 +117,7 @@ table! {
 
 allow_tables_to_appear_in_same_query!(
     access_control_list,
+    announcements,
     contests,
     problem_sets,
     problems,

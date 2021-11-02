@@ -13,3 +13,4 @@ pub mod statistics;
 pub mod submissions;
 pub mod users;
 pub mod utils;
+pub mod announcements;
