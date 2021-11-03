@@ -7,10 +7,14 @@ use server_core::errors::{ServiceError, ServiceResult};
 use server_core::utils::encryption;
 
 pub fn create(
-    account: String,
+    username: String,
     password: String,
-    mobile: Option<String>,
+    email: String,
     role: String,
+    real_name: Option<String>,
+    school: Option<String>,
+    student_number: Option<String>,
+    profile_picture_url: Option<String>,
     pool: web::Data<Pool>,
 ) -> ServiceResult<()> {
     let (salt, hash) = {
@@ -26,9 +30,13 @@ pub fn create(
         .values(&InsertableUser {
             salt: salt,
             hash: hash,
-            account: account,
-            mobile: mobile,
+            username: username,
+            email: email,
             role: role,
+            real_name: real_name,
+            school: school,
+            student_number: student_number,
+            profile_picture_url: profile_picture_url,
         })
         .execute(conn)?;
 
@@ -42,7 +50,7 @@ pub fn get_name(id: i32, pool: web::Data<Pool>) -> ServiceResult<String> {
 
     let name: String = users_schema::table
         .filter(users_schema::id.eq(id))
-        .select(users_schema::account)
+        .select(users_schema::username)
         .first(conn)?;
 
     Ok(name)
@@ -61,10 +69,14 @@ pub fn get(id: i32, pool: web::Data<Pool>) -> ServiceResult<OutUser> {
 
 pub fn update(
     id: i32,
-    new_account: Option<String>,
+    new_username: Option<String>,
     new_password: Option<String>,
-    new_mobile: Option<String>,
+    new_email: Option<String>,
     new_role: Option<String>,
+    new_real_name: Option<String>,
+    new_school: Option<String>,
+    new_student_number: Option<String>,
+    new_profile_picture_url: Option<String>,
     pool: web::Data<Pool>,
 ) -> ServiceResult<()> {
     let conn = &db_connection(&pool)?;
@@ -82,9 +94,13 @@ pub fn update(
         .set(UserForm {
             salt: new_salt,
             hash: new_hash,
-            account: new_account,
-            mobile: new_mobile,
+            username: new_username,
+            email: new_email,
             role: new_role,
+            real_name: new_real_name,
+            school: new_school,
+            student_number: new_student_number,
+            profile_picture_url: new_profile_picture_url,
         })
         .execute(conn)?;
 
@@ -93,21 +109,21 @@ pub fn update(
 
 pub fn get_list(
     id_filter: Option<i32>,
-    account_filter: Option<String>,
-    mobile_filter: Option<String>,
+    username_filter: Option<String>,
+    email_filter: Option<String>,
     role_filter: Option<String>,
     id_order: Option<bool>,
     limit: i32,
     offset: i32,
     pool: web::Data<Pool>,
 ) -> ServiceResult<SizedList<OutUser>> {
-    let account_filter = if let Some(inner_data) = account_filter {
+    let username_filter = if let Some(inner_data) = username_filter {
         Some(String::from("%") + &inner_data.as_str().replace(" ", "%") + "%")
     } else {
         None
     };
 
-    let mobile_filter = if let Some(inner_data) = mobile_filter {
+    let email_filter = if let Some(inner_data) = email_filter {
         Some(String::from("%") + &inner_data.as_str().replace(" ", "%") + "%")
     } else {
         None
@@ -124,15 +140,16 @@ pub fn get_list(
                 .or(id_filter.is_none()),
         )
         .filter(
-            users_schema::account
+            users_schema::username
                 .nullable()
-                .like(account_filter.clone())
-                .or(account_filter.is_none()),
+                .like(username_filter.clone())
+                .or(username_filter.is_none()),
         )
         .filter(
-            users_schema::mobile
-                .like(mobile_filter.clone())
-                .or(mobile_filter.is_none()),
+            users_schema::email
+                .nullable()
+                .like(email_filter.clone())
+                .or(email_filter.is_none()),
         )
         .filter(
             users_schema::role
@@ -165,12 +182,12 @@ pub fn get_list(
     })
 }
 
-pub fn login(account: String, password: String, pool: web::Data<Pool>) -> ServiceResult<SlimUser> {
+pub fn login(username: String, password: String, pool: web::Data<Pool>) -> ServiceResult<SlimUser> {
     let conn = &db_connection(&pool)?;
 
     use crate::schema::users as users_schema;
     let user: User = users_schema::table
-        .filter(users_schema::account.eq(account))
+        .filter(users_schema::username.eq(username))
         .first(conn)?;
 
     if user.hash.is_none() || user.salt.is_none() {

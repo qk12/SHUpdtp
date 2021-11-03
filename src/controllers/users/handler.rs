@@ -8,8 +8,8 @@ use server_core::errors::ServiceError;
 #[derive(Deserialize)]
 pub struct GetUserListParams {
     id_filter: Option<i32>,
-    account_filter: Option<String>,
-    mobile_filter: Option<String>,
+    username_filter: Option<String>,
+    email_filter: Option<String>,
     role_filter: Option<String>,
     id_order: Option<bool>,
     limit: i32,
@@ -24,8 +24,8 @@ pub async fn get_list(
     let res = web::block(move || {
         user::get_list(
             query.id_filter,
-            query.account_filter.clone(),
-            query.mobile_filter.clone(),
+            query.username_filter.clone(),
+            query.email_filter.clone(),
             query.role_filter.clone(),
             query.id_order.clone(),
             query.limit,
@@ -44,10 +44,14 @@ pub async fn get_list(
 
 #[derive(Deserialize)]
 pub struct CreateUserBody {
-    account: String,
+    username: String,
     password: String,
-    mobile: Option<String>,
+    email: String,
     role: String,
+    real_name: Option<String>,
+    school: Option<String>,
+    student_number: Option<String>,
+    profile_picture_url: Option<String>,
 }
 
 #[post("")]
@@ -57,10 +61,14 @@ pub async fn create(
 ) -> Result<HttpResponse, ServiceError> {
     let res = web::block(move || {
         user::create(
-            body.account.clone(),
+            body.username.clone(),
             body.password.clone(),
-            body.mobile.clone(),
+            body.email.clone(),
             body.role.clone(),
+            body.real_name.clone(),
+            body.school.clone(),
+            body.student_number.clone(),
+            body.profile_picture_url.clone(),
             pool,
         )
     })
@@ -103,10 +111,14 @@ pub async fn get(
 
 #[derive(Deserialize)]
 pub struct UpdateUserBody {
-    new_account: Option<String>,
+    new_username: Option<String>,
     new_password: Option<String>,
-    new_mobile: Option<String>,
+    new_email: Option<String>,
     new_role: Option<String>,
+    new_real_name: Option<String>,
+    new_school: Option<String>,
+    new_student_number: Option<String>,
+    new_profile_picture_url: Option<String>,
 }
 
 #[put("/{id}")]
@@ -128,10 +140,14 @@ pub async fn update(
     let res = web::block(move || {
         user::update(
             id,
-            body.new_account.clone(),
+            body.new_username.clone(),
             body.new_password.clone(),
-            body.new_mobile.clone(),
+            body.new_email.clone(),
             body.new_role.clone(),
+            body.new_real_name.clone(),
+            body.new_school.clone(),
+            body.new_student_number.clone(),
+            body.new_profile_picture_url.clone(),
             pool,
         )
     })
@@ -146,7 +162,7 @@ pub async fn update(
 
 #[derive(Deserialize)]
 pub struct LoginBody {
-    account: String,
+    username: String,
     password: String,
 }
 
@@ -156,7 +172,7 @@ pub async fn login(
     identity: Identity,
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, ServiceError> {
-    let res = web::block(move || user::login(body.account.clone(), body.password.clone(), pool))
+    let res = web::block(move || user::login(body.username.clone(), body.password.clone(), pool))
         .await
         .map_err(|e| {
             eprintln!("{}", e);

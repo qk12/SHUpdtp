@@ -10,9 +10,13 @@ pub struct User {
     pub id: i32,
     pub salt: Option<String>,
     pub hash: Option<Vec<u8>>,
-    pub account: String,
-    pub mobile: Option<String>,
+    pub username: String,
+    pub email: String,
     pub role: String,
+    pub real_name: Option<String>,
+    pub school: Option<String>,
+    pub student_number: Option<String>,
+    pub profile_picture_url: Option<String>,
 }
 
 #[derive(Debug, Insertable)]
@@ -20,26 +24,38 @@ pub struct User {
 pub struct InsertableUser {
     pub salt: Option<String>,
     pub hash: Option<Vec<u8>>,
-    pub account: String,
-    pub mobile: Option<String>,
+    pub username: String,
+    pub email: String,
     pub role: String,
+    pub real_name: Option<String>,
+    pub school: Option<String>,
+    pub student_number: Option<String>,
+    pub profile_picture_url: Option<String>,
 }
 
 #[derive(Serialize)]
 pub struct OutUser {
     pub id: i32,
-    pub account: String,
-    pub mobile: Option<String>,
+    pub username: String,
+    pub email: String,
     pub role: String,
+    pub real_name: Option<String>,
+    pub school: Option<String>,
+    pub student_number: Option<String>,
+    pub profile_picture_url: Option<String>,
 }
 
 impl From<User> for OutUser {
     fn from(user: User) -> Self {
         Self {
             id: user.id,
-            account: user.account,
-            mobile: user.mobile,
+            username: user.username,
+            email: user.email,
             role: user.role,
+            real_name: user.real_name,
+            school: user.school,
+            student_number: user.student_number,
+            profile_picture_url: user.profile_picture_url,
         }
     }
 }
@@ -49,9 +65,13 @@ impl From<User> for OutUser {
 pub struct UserForm {
     pub salt: Option<String>,
     pub hash: Option<Vec<u8>>,
-    pub account: Option<String>,
-    pub mobile: Option<String>,
+    pub username: Option<String>,
+    pub email: Option<String>,
     pub role: Option<String>,
+    pub real_name: Option<String>,
+    pub school: Option<String>,
+    pub student_number: Option<String>,
+    pub profile_picture_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

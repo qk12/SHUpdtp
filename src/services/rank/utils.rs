@@ -102,7 +102,7 @@ fn build_acm_rank_column(
     use crate::schema::users as users_schema;
     let account = users_schema::table
         .filter(users_schema::id.eq(user_id))
-        .select(users_schema::account)
+        .select(users_schema::username)
         .first::<String>(conn)?;
 
     let mut rank_column = ACMRankColumn {

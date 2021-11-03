@@ -109,9 +109,13 @@ table! {
         id -> Int4,
         salt -> Nullable<Varchar>,
         hash -> Nullable<Bytea>,
-        account -> Text,
-        mobile -> Nullable<Text>,
+        username -> Text,
+        email -> Text,
         role -> Text,
+        real_name -> Nullable<Text>,
+        school -> Nullable<Text>,
+        student_number -> Nullable<Text>,
+        profile_picture_url -> Nullable<Text>,
     }
 }
 
