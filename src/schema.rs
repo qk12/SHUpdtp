@@ -115,7 +115,7 @@ table! {
         real_name -> Nullable<Text>,
         school -> Nullable<Text>,
         student_number -> Nullable<Text>,
-        profile_picture_url -> Nullable<Text>,
+        profile_picture -> Text,
     }
 }
 

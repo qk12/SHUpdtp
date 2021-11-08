@@ -15,6 +15,8 @@ actix = "0.10.0"
 
 # Web framework
 actix-web = "3"
+# HTTP client
+reqwest = { version = "0.11", features = ["blocking", "json", "multipart"] }
 # Middleware
 actix-identity = "0.3"
 actix-cors = "0.5"
@@ -53,6 +55,7 @@ base64 = "0.13.0"
 digest = "0.9.0"
 lazy_static = "1.1"
 regex = "1.4"
+sanitize-filename = "0.3.0"
 
 server-core = { path = "crates/server-core" }
 shupdtp-db = { path = "crates/shupdtp-db" }

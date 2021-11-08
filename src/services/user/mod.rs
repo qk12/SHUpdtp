@@ -5,6 +5,8 @@ use diesel::prelude::*;
 use server_core::database::{db_connection, Pool};
 use server_core::errors::{ServiceError, ServiceResult};
 use server_core::utils::encryption;
+use std::fs;
+use std::io::prelude::*;
 
 pub fn create(
     username: String,
@@ -14,7 +16,6 @@ pub fn create(
     real_name: Option<String>,
     school: Option<String>,
     student_number: Option<String>,
-    profile_picture_url: Option<String>,
     pool: web::Data<Pool>,
 ) -> ServiceResult<()> {
     let (salt, hash) = {
@@ -22,6 +23,12 @@ pub fn create(
         let hash = encryption::make_hash(&password, &salt).to_vec();
         (Some(salt), Some(hash))
     };
+
+    let profile_picture = ProfilePicture {
+        url: None,
+        delete_url: None,
+    };
+    let profile_picture_string = serde_json::to_string(&profile_picture).unwrap();
 
     let conn = &db_connection(&pool)?;
 
@@ -36,7 +43,7 @@ pub fn create(
             real_name: real_name,
             school: school,
             student_number: student_number,
-            profile_picture_url: profile_picture_url,
+            profile_picture: profile_picture_string,
         })
         .execute(conn)?;
 
@@ -76,7 +83,6 @@ pub fn update(
     new_real_name: Option<String>,
     new_school: Option<String>,
     new_student_number: Option<String>,
-    new_profile_picture_url: Option<String>,
     pool: web::Data<Pool>,
 ) -> ServiceResult<()> {
     let conn = &db_connection(&pool)?;
@@ -100,7 +106,6 @@ pub fn update(
             real_name: new_real_name,
             school: new_school,
             student_number: new_student_number,
-            profile_picture_url: new_profile_picture_url,
         })
         .execute(conn)?;
 
@@ -223,8 +228,20 @@ pub fn get_permitted_methods(role: String, path: String) -> ServiceResult<Vec<St
 
 pub fn delete(id: i32, pool: web::Data<Pool>) -> ServiceResult<()> {
     let conn = &db_connection(&pool)?;
-
     use crate::schema::users as users_schema;
+
+    let old_profile_picture_string = users_schema::table
+        .filter(users_schema::id.eq(id))
+        .select(users_schema::profile_picture)
+        .first::<String>(conn)?;
+    let old_profile_picture =
+        serde_json::from_str::<ProfilePicture>(&old_profile_picture_string).unwrap();
+
+    if let Some(old_delete_url) = old_profile_picture.delete_url {
+        let client = reqwest::blocking::Client::new();
+        let response = client.get(old_delete_url).send().unwrap();
+    }
+
     diesel::delete(users_schema::table.filter(users_schema::id.eq(id))).execute(conn)?;
 
     Ok(())
@@ -337,4 +354,94 @@ pub fn get_submissions_time(
     }
 
     Ok(time_count)
+}
+
+#[derive(Deserialize)]
+pub struct SmmsProfilePictureData {
+    file_id: i32,
+    width: i32,
+    height: i32,
+    filename: String,
+    storename: String,
+    path: String,
+    hash: String,
+    url: String,
+    delete: String,
+    page: String,
+}
+
+#[derive(Deserialize)]
+pub struct SmmsProfilePicture {
+    success: bool,
+    code: String,
+    message: String,
+    data: Option<SmmsProfilePictureData>,
+    RequestId: String,
+}
+
+pub fn upload_profile_picture(
+    id: i32,
+    filename: String,
+    picture_buf: &[u8],
+    pool: web::Data<Pool>,
+) -> ServiceResult<Option<String>> {
+    let file_path = format!("image/tmp/{}", sanitize_filename::sanitize(&filename));
+
+    let mut file = fs::File::create(file_path.clone())?;
+    file.write_all(&picture_buf)
+        .expect("Error writing picture.");
+
+    let conn = &db_connection(&pool)?;
+    use crate::schema::users as users_schema;
+
+    let old_profile_picture_string = users_schema::table
+        .filter(users_schema::id.eq(id))
+        .select(users_schema::profile_picture)
+        .first::<String>(conn)?;
+    let old_profile_picture =
+        serde_json::from_str::<ProfilePicture>(&old_profile_picture_string).unwrap();
+
+    if let Some(old_delete_url) = old_profile_picture.delete_url {
+        let client = reqwest::blocking::Client::new();
+        let response = client.get(old_delete_url).send();
+    }
+
+    let client = reqwest::blocking::Client::new();
+    let form = reqwest::blocking::multipart::Form::new().file("smfile", file_path.clone())?;
+
+    let response_body: SmmsProfilePicture = client
+        .post("https://sm.ms/api/v2/upload")
+        .header("Authorization", "grM6s8VWsUrUDpcMkqIzPWsjCAJRe2E9")
+        .multipart(form)
+        .send()
+        .unwrap()
+        .json()
+        .unwrap();
+
+    fs::remove_file(file_path)?;
+
+    if !response_body.success {
+        let hint = response_body.message;
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let (new_url, new_delete_url) = {
+        if let Some(inner_data) = response_body.data {
+            (Some(inner_data.url), Some(inner_data.delete))
+        } else {
+            (None, None)
+        }
+    };
+
+    let new_profile_picture = ProfilePicture {
+        url: new_url.clone(),
+        delete_url: new_delete_url,
+    };
+    let new_profile_picture_string = serde_json::to_string(&new_profile_picture).unwrap();
+
+    diesel::update(users_schema::table.filter(users_schema::id.eq(id)))
+        .set(users_schema::profile_picture.eq(new_profile_picture_string))
+        .execute(conn)?;
+
+    Ok(new_url)
 }

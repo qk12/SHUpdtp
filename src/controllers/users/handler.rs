@@ -1,7 +1,9 @@
 use crate::models::users::LoggedUser;
 use crate::services::user;
 use actix_identity::Identity;
+use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
+use futures::{StreamExt, TryStreamExt};
 use server_core::database::Pool;
 use server_core::errors::ServiceError;
 
@@ -51,7 +53,6 @@ pub struct CreateUserBody {
     real_name: Option<String>,
     school: Option<String>,
     student_number: Option<String>,
-    profile_picture_url: Option<String>,
 }
 
 #[post("")]
@@ -68,7 +69,6 @@ pub async fn create(
             body.real_name.clone(),
             body.school.clone(),
             body.student_number.clone(),
-            body.profile_picture_url.clone(),
             pool,
         )
     })
@@ -118,7 +118,6 @@ pub struct UpdateUserBody {
     new_real_name: Option<String>,
     new_school: Option<String>,
     new_student_number: Option<String>,
-    new_profile_picture_url: Option<String>,
 }
 
 #[put("/{id}")]
@@ -147,7 +146,6 @@ pub async fn update(
             body.new_real_name.clone(),
             body.new_school.clone(),
             body.new_student_number.clone(),
-            body.new_profile_picture_url.clone(),
             pool,
         )
     })
@@ -281,6 +279,50 @@ pub async fn get_submissions_time(
     }
 
     let res = web::block(move || user::get_submissions_time(user_id, pool))
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
+
+    Ok(HttpResponse::Ok().json(&res))
+}
+
+#[post("/{id}/profile_picture")]
+pub async fn upload_profile_picture(
+    web::Path(id): web::Path<i32>,
+    logged_user: LoggedUser,
+    mut payload: Multipart,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, ServiceError> {
+    if logged_user.0.is_none() {
+        return Err(ServiceError::Unauthorized);
+    }
+    let cur_user = logged_user.0.unwrap();
+    if cur_user.id != id && cur_user.role != "sup" && cur_user.role != "admin" {
+        let hint = "No permission.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let mut bytes = web::BytesMut::new();
+    let mut filename = None;
+    while let Ok(Some(mut field)) = payload.try_next().await {
+        let content_type = field.content_disposition().unwrap();
+        if filename.is_none() {
+            filename = Some(content_type.get_filename().unwrap().to_owned());
+        } else {
+            if filename.clone().unwrap() != content_type.get_filename().unwrap() {
+                continue;
+            }
+        }
+
+        while let Some(chunk) = field.next().await {
+            let data = chunk.unwrap();
+            bytes.extend_from_slice(&data);
+        }
+    }
+
+    let res = web::block(move || user::upload_profile_picture(id, filename.unwrap(), &bytes, pool))
         .await
         .map_err(|e| {
             eprintln!("{}", e);

@@ -16,7 +16,7 @@ pub struct User {
     pub real_name: Option<String>,
     pub school: Option<String>,
     pub student_number: Option<String>,
-    pub profile_picture_url: Option<String>,
+    pub profile_picture: String,
 }
 
 #[derive(Debug, Insertable)]
@@ -30,7 +30,7 @@ pub struct InsertableUser {
     pub real_name: Option<String>,
     pub school: Option<String>,
     pub student_number: Option<String>,
-    pub profile_picture_url: Option<String>,
+    pub profile_picture: String,
 }
 
 #[derive(Serialize)]
@@ -55,7 +55,9 @@ impl From<User> for OutUser {
             real_name: user.real_name,
             school: user.school,
             student_number: user.student_number,
-            profile_picture_url: user.profile_picture_url,
+            profile_picture_url: serde_json::from_str::<ProfilePicture>(&user.profile_picture)
+                .unwrap()
+                .url,
         }
     }
 }
@@ -71,7 +73,6 @@ pub struct UserForm {
     pub real_name: Option<String>,
     pub school: Option<String>,
     pub student_number: Option<String>,
-    pub profile_picture_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,4 +148,10 @@ pub struct UserSubmissionCount {
 pub struct UserSubmissionTime {
     pub date: NaiveDate,
     pub count: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
+pub struct ProfilePicture {
+    pub url: Option<String>,
+    pub delete_url: Option<String>,
 }
