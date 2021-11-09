@@ -3,6 +3,7 @@ use actix_identity::RequestIdentity;
 use actix_web::dev::Payload;
 use actix_web::{Error, FromRequest, HttpRequest};
 use chrono::NaiveDate;
+use server_core::utils::encryption;
 use shrinkwraprs::Shrinkwrap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
@@ -154,4 +155,42 @@ pub struct UserSubmissionTime {
 pub struct ProfilePicture {
     pub url: Option<String>,
     pub delete_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct BatchCreateUserBody {
+    pub student_number: String,
+    pub real_name: String,
+}
+
+impl From<BatchCreateUserBody> for InsertableUser {
+    fn from(body: BatchCreateUserBody) -> Self {
+        let password = body.student_number.clone();
+        let (salt, hash) = {
+            let salt = encryption::make_salt();
+            let hash = encryption::make_hash(&password, &salt).to_vec();
+            (Some(salt), Some(hash))
+        };
+
+        let username = body.student_number.clone();
+        let email = body.student_number.clone();
+        let role = String::from("student");
+        let school = Some(String::from("上海大学"));
+        let profile_picture = ProfilePicture {
+            url: None,
+            delete_url: None,
+        };
+
+        Self {
+            salt: salt,
+            hash: hash,
+            username: username,
+            email: email,
+            role: role,
+            real_name: Some(body.real_name),
+            school: school,
+            student_number: Some(body.student_number),
+            profile_picture: serde_json::to_string(&profile_picture).unwrap(),
+        }
+    }
 }

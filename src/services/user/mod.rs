@@ -445,3 +445,23 @@ pub fn upload_profile_picture(
 
     Ok(new_url)
 }
+
+pub fn batch_create(
+    batch_create_user_list: Vec<BatchCreateUserBody>,
+    pool: web::Data<Pool>,
+) -> ServiceResult<()> {
+    let mut res = Vec::new();
+    for batch_create_user_body in batch_create_user_list {
+        res.push(InsertableUser::from(batch_create_user_body));
+    }
+
+    let conn = &db_connection(&pool)?;
+
+    use crate::schema::users as users_schema;
+    diesel::insert_into(users_schema::table)
+        .values(&res)
+        .on_conflict_do_nothing()
+        .execute(conn)?;
+
+    Ok(())
+}

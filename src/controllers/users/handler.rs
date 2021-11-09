@@ -1,4 +1,4 @@
-use crate::models::users::LoggedUser;
+use crate::models::users::{BatchCreateUserBody, LoggedUser};
 use crate::services::user;
 use actix_identity::Identity;
 use actix_multipart::Multipart;
@@ -330,4 +330,34 @@ pub async fn upload_profile_picture(
         })?;
 
     Ok(HttpResponse::Ok().json(&res))
+}
+
+#[derive(Deserialize)]
+pub struct BatchCreateUserList {
+    list: Vec<BatchCreateUserBody>,
+}
+
+#[post("/batch_create")]
+pub async fn batch_create(
+    body: web::Json<BatchCreateUserList>,
+    logged_user: LoggedUser,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, ServiceError> {
+    if logged_user.0.is_none() {
+        return Err(ServiceError::Unauthorized);
+    }
+    let cur_user = logged_user.0.unwrap();
+    if cur_user.role != "sup" && cur_user.role != "admin" {
+        let hint = "No permission.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let res = web::block(move || user::batch_create(body.list.clone(), pool))
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
+
+    Ok(HttpResponse::Ok().json(()))
 }
