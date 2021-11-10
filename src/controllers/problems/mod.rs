@@ -12,6 +12,7 @@ pub fn route(cfg: &mut web::ServiceConfig) {
             .service(handler::get)
             .service(handler::delete)
             .service(handler::create)
-            .service(handler::update),
+            .service(handler::update)
+            .service(handler::get_test_case),
     );
 }

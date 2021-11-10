@@ -2,6 +2,7 @@ mod utils;
 
 use crate::models::problems::*;
 use crate::models::utils::SizedList;
+use actix_files::NamedFile;
 use actix_web::web;
 use diesel::prelude::*;
 use server_core::database::{db_connection, Pool};
@@ -400,4 +401,14 @@ pub fn update(
         .execute(conn)?;
 
     Ok(())
+}
+
+pub fn get_test_case(id: i32, test_case_id: i32, input: bool) -> ServiceResult<NamedFile> {
+    let file_path = if input {
+        format!("data/test_cases/{}/{}.in", id, test_case_id)
+    } else {
+        format!("data/test_cases/{}/{}.out", id, test_case_id)
+    };
+
+    Ok(NamedFile::open(file_path)?)
 }

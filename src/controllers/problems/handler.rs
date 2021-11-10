@@ -1,6 +1,7 @@
 use crate::models::problems::{ProblemContents, ProblemInfo, ProblemSettings};
 use crate::models::users::LoggedUser;
 use crate::services::problem;
+use actix_files::NamedFile;
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use futures::{StreamExt, TryStreamExt};
@@ -260,4 +261,24 @@ pub async fn update(
     })?;
 
     Ok(HttpResponse::Ok().json(&res))
+}
+
+#[derive(Deserialize)]
+pub struct GetTestCaseParams {
+    input: bool,
+}
+
+#[get("/{id}/test_case/{test_case_id}")]
+pub async fn get_test_case(
+    web::Path((id, test_case_id)): web::Path<(i32, i32)>,
+    query: web::Query<GetTestCaseParams>,
+) -> Result<NamedFile, ServiceError> {
+    let res = web::block(move || problem::get_test_case(id, test_case_id, query.input))
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
+
+    Ok(res)
 }
