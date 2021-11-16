@@ -39,10 +39,17 @@ table! {
 }
 
 table! {
+    problem_tags (id) {
+        id -> Int4,
+        name -> Text,
+    }
+}
+
+table! {
     problems (id) {
         id -> Int4,
         title -> Text,
-        tags -> Array<Text>,
+        tags -> Array<Int4>,
         difficulty -> Float8,
         contents -> Text,
         settings -> Text,
@@ -124,6 +131,7 @@ allow_tables_to_appear_in_same_query!(
     announcements,
     contests,
     problem_sets,
+    problem_tags,
     problems,
     region_access_settings,
     region_links,

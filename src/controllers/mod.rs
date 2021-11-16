@@ -1,9 +1,10 @@
+pub mod announcements;
 pub mod contests;
 pub mod judge_servers;
 pub mod problem_sets;
+pub mod problem_tags;
 pub mod problems;
 pub mod regions;
 pub mod samples;
 pub mod submissions;
 pub mod users;
-pub mod announcements;

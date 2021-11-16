@@ -96,7 +96,7 @@ pub fn read_insertable_problem(path: &str) -> ServiceResult<problems::Insertable
 
     Ok(problems::InsertableProblem {
         title: info.title,
-        tags: info.tags,
+        tags: Vec::<i32>::new(),
         difficulty: info.difficulty,
         contents: serde_json::to_string(&contents).unwrap(),
         settings: serde_json::to_string(&settings).unwrap(),

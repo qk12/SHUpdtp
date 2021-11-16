@@ -100,7 +100,7 @@ pub fn get_linked_problem_column_list(
     inner_id_filter: Option<i32>,
     problem_id_filter: Option<i32>,
     title_filter: Option<String>,
-    tag_filter: Option<Vec<String>>,
+    tag_filter: Option<Vec<i32>>,
     difficulty_filter: Option<String>,
     id_order: Option<bool>,
     problem_id_order: Option<bool>,
@@ -117,10 +117,10 @@ pub fn get_linked_problem_column_list(
         None
     };
 
-    let tag_filter: Vec<String> = if let Some(inner_data) = tag_filter {
+    let tag_filter: Vec<i32> = if let Some(inner_data) = tag_filter {
         inner_data.clone()
     } else {
-        Vec::<String>::new()
+        Vec::<i32>::new()
     };
 
     let (min_difficulty, max_difficulty) = if difficulty_filter.is_none() {

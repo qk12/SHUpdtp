@@ -1,8 +1,10 @@
 pub mod access_control_list;
+pub mod announcements;
 pub mod contests;
 pub mod judge_servers;
 pub mod languages;
 pub mod problem_sets;
+pub mod problem_tags;
 pub mod problems;
 pub mod ranks;
 pub mod region_access_settings;
@@ -13,4 +15,3 @@ pub mod statistics;
 pub mod submissions;
 pub mod users;
 pub mod utils;
-pub mod announcements;

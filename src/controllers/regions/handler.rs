@@ -3,6 +3,7 @@ use crate::judge_actor::JudgeActorAddr;
 use crate::models::users::LoggedUser;
 use crate::services::region;
 use actix_web::{delete, get, post, put, web, HttpResponse};
+use serde_qs::actix::QsQuery;
 use server_core::database::Pool;
 use server_core::errors::ServiceError;
 
@@ -68,7 +69,7 @@ pub struct GetLinkedProblemColumnParams {
     inner_id_filter: Option<i32>,
     problem_id_filter: Option<i32>,
     title_filter: Option<String>,
-    tag_filter: Option<Vec<String>>,
+    tag_filter: Option<Vec<i32>>,
     difficulty_filter: Option<String>,
     inner_id_order: Option<bool>,
     problem_id_order: Option<bool>,
@@ -80,7 +81,7 @@ pub struct GetLinkedProblemColumnParams {
 #[get("/{region}")]
 pub async fn get_linked_problem_column_list(
     web::Path(region): web::Path<String>,
-    query: web::Query<GetLinkedProblemColumnParams>,
+    query: QsQuery<GetLinkedProblemColumnParams>,
     pool: web::Data<Pool>,
     logged_user: LoggedUser,
 ) -> Result<HttpResponse, ServiceError> {

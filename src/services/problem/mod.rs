@@ -142,7 +142,7 @@ pub fn change_release_state(
 pub fn get_list(
     id_filter: Option<i32>,
     title_filter: Option<String>,
-    tag_filter: Option<Vec<String>>,
+    tag_filter: Option<Vec<i32>>,
     difficulty_filter: Option<String>,
     release_filter: Option<bool>,
     id_order: Option<bool>,
@@ -157,11 +157,18 @@ pub fn get_list(
         None
     };
 
-    let tag_filter: Vec<String> = if let Some(inner_data) = tag_filter {
+    let tag_filter: Vec<i32> = if let Some(inner_data) = tag_filter {
         inner_data
     } else {
-        Vec::<String>::new()
+        Vec::<i32>::new()
     };
+
+    log::info!("{}", tag_filter.len());
+    for i in &tag_filter {
+        log::info!("{}", i);
+    }
+
+    //let tag_filter = Vec::<i32>::new();
 
     let (min_difficulty, max_difficulty) = if difficulty_filter.is_none() {
         (0.0, 10.0)
@@ -338,7 +345,9 @@ pub fn delete(id: i32, pool: web::Data<Pool>) -> ServiceResult<()> {
 }
 
 pub fn create(
-    info: ProblemInfo,
+    title: String,
+    tags: Vec<i32>,
+    difficulty: f64,
     contents: ProblemContents,
     settings: ProblemSettings,
     pool: web::Data<Pool>,
@@ -348,9 +357,9 @@ pub fn create(
     use crate::schema::problems as problems_schema;
     diesel::insert_into(problems_schema::table)
         .values(&InsertableProblem {
-            title: info.title,
-            tags: info.tags,
-            difficulty: info.difficulty,
+            title: title,
+            tags: tags,
+            difficulty: difficulty,
             contents: serde_json::to_string(&contents).unwrap(),
             settings: serde_json::to_string(&settings).unwrap(),
             is_released: false,
@@ -362,7 +371,9 @@ pub fn create(
 
 pub fn update(
     id: i32,
-    new_info: Option<ProblemInfo>,
+    new_title: Option<String>,
+    new_tags: Option<Vec<i32>>,
+    new_difficulty: Option<f64>,
     new_contents: Option<ProblemContents>,
     new_settings: Option<ProblemSettings>,
     pool: web::Data<Pool>,
@@ -372,21 +383,9 @@ pub fn update(
     use crate::schema::problems as problems_schema;
     diesel::update(problems_schema::table.filter(problems_schema::id.eq(id)))
         .set(ProblemForm {
-            title: if let Some(inner_data) = new_info.clone() {
-                Some(inner_data.title)
-            } else {
-                None
-            },
-            tags: if let Some(inner_data) = new_info.clone() {
-                Some(inner_data.tags)
-            } else {
-                None
-            },
-            difficulty: if let Some(inner_data) = new_info {
-                Some(inner_data.difficulty)
-            } else {
-                None
-            },
+            title: new_title,
+            tags: new_tags,
+            difficulty: new_difficulty,
             contents: if let Some(inner_data) = new_contents {
                 Some(serde_json::to_string(&inner_data).unwrap())
             } else {

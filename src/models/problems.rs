@@ -1,10 +1,11 @@
 use crate::schema::*;
+use crate::statics::PROBLEM_TAG_NAME_CACHE;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
 pub struct RawProblem {
     pub id: i32,
     pub title: String,
-    pub tags: Vec<String>,
+    pub tags: Vec<i32>,
     pub difficulty: f64,
     pub contents: String,
     pub settings: String,
@@ -15,7 +16,7 @@ pub struct RawProblem {
 #[table_name = "problems"]
 pub struct InsertableProblem {
     pub title: String,
-    pub tags: Vec<String>,
+    pub tags: Vec<i32>,
     pub difficulty: f64,
     pub contents: String,
     pub settings: String,
@@ -64,11 +65,21 @@ pub struct Problem {
 
 impl From<RawProblem> for Problem {
     fn from(raw: RawProblem) -> Self {
+        let mut tag_names = Vec::new();
+        {
+            let lock = PROBLEM_TAG_NAME_CACHE.read().unwrap();
+            for tag_id in &raw.tags {
+                if let Some(tag_name) = lock.get(tag_id) {
+                    tag_names.push(tag_name.clone());
+                }
+            }
+        }
+
         Self {
             id: raw.id,
             info: ProblemInfo {
                 title: raw.title,
-                tags: raw.tags,
+                tags: tag_names,
                 difficulty: raw.difficulty,
             },
             contents: serde_json::from_str::<ProblemContents>(&raw.contents).unwrap(),
@@ -88,11 +99,21 @@ pub struct SlimProblem {
 
 impl From<RawProblem> for SlimProblem {
     fn from(raw: RawProblem) -> Self {
+        let mut tag_names = Vec::new();
+        {
+            let lock = PROBLEM_TAG_NAME_CACHE.read().unwrap();
+            for tag_id in &raw.tags {
+                if let Some(tag_name) = lock.get(tag_id) {
+                    tag_names.push(tag_name.clone());
+                }
+            }
+        }
+
         Self {
             id: raw.id,
             info: ProblemInfo {
                 title: raw.title,
-                tags: raw.tags,
+                tags: tag_names,
                 difficulty: raw.difficulty,
             },
             is_released: raw.is_released,
@@ -110,11 +131,21 @@ pub struct OutProblem {
 
 impl From<RawProblem> for OutProblem {
     fn from(raw: RawProblem) -> Self {
+        let mut tag_names = Vec::new();
+        {
+            let lock = PROBLEM_TAG_NAME_CACHE.read().unwrap();
+            for tag_id in &raw.tags {
+                if let Some(tag_name) = lock.get(tag_id) {
+                    tag_names.push(tag_name.clone());
+                }
+            }
+        }
+
         Self {
             id: raw.id,
             info: ProblemInfo {
                 title: raw.title,
-                tags: raw.tags,
+                tags: tag_names,
                 difficulty: raw.difficulty,
             },
             is_released: raw.is_released,
@@ -133,7 +164,7 @@ pub struct CreateProblemsResult {
 #[table_name = "problems"]
 pub struct ProblemForm {
     pub title: Option<String>,
-    pub tags: Option<Vec<String>>,
+    pub tags: Option<Vec<i32>>,
     pub difficulty: Option<f64>,
     pub contents: Option<String>,
     pub settings: Option<String>,

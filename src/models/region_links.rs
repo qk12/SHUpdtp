@@ -1,5 +1,6 @@
 use super::problems;
 use crate::schema::*;
+use crate::statics::PROBLEM_TAG_NAME_CACHE;
 use server_core::errors::ServiceResult;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Insertable, Queryable)]
@@ -24,7 +25,7 @@ pub struct RawLinkedProblemColumn {
     pub inner_id: i32,
     pub problem_id: i32,
     pub problem_title: String,
-    pub problem_tags: Vec<String>,
+    pub problem_tags: Vec<i32>,
     pub problem_difficulty: f64,
     pub is_released: bool,
 }
@@ -47,6 +48,16 @@ pub fn get_column_from_raw(
 ) -> ServiceResult<LinkedProblemColumn> {
     let statistic = get_results(conn, raw.region.clone(), raw.problem_id)?;
 
+    let mut tag_names = Vec::new();
+    {
+        let lock = PROBLEM_TAG_NAME_CACHE.read().unwrap();
+        for tag_id in &raw.problem_tags {
+            if let Some(tag_name) = lock.get(tag_id) {
+                tag_names.push(tag_name.clone());
+            }
+        }
+    }
+
     Ok(LinkedProblemColumn {
         region: raw.region,
         inner_id: raw.inner_id,
@@ -54,7 +65,7 @@ pub fn get_column_from_raw(
             id: raw.problem_id,
             info: problems::ProblemInfo {
                 title: raw.problem_title,
-                tags: raw.problem_tags,
+                tags: tag_names,
                 difficulty: raw.problem_difficulty,
             },
             is_released: raw.is_released,

@@ -1,10 +1,11 @@
-use crate::models::problems::{ProblemContents, ProblemInfo, ProblemSettings};
+use crate::models::problems::{ProblemContents, ProblemSettings};
 use crate::models::users::LoggedUser;
 use crate::services::problem;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use futures::{StreamExt, TryStreamExt};
+use serde_qs::actix::QsQuery;
 use server_core::database::Pool;
 use server_core::errors::ServiceError;
 
@@ -81,7 +82,7 @@ pub async fn change_release_state(
 pub struct GetProblemListParams {
     id_filter: Option<i32>,
     title_filter: Option<String>,
-    tag_filter: Option<Vec<String>>,
+    tag_filter: Option<Vec<i32>>,
     difficulty_filter: Option<String>,
     release_filter: Option<bool>,
     id_order: Option<bool>,
@@ -92,7 +93,7 @@ pub struct GetProblemListParams {
 
 #[get("")]
 pub async fn get_list(
-    query: web::Query<GetProblemListParams>,
+    query: QsQuery<GetProblemListParams>,
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, ServiceError> {
     let res = web::block(move || {
@@ -185,7 +186,9 @@ pub async fn delete(
 
 #[derive(Deserialize)]
 pub struct CreateProblemBody {
-    info: ProblemInfo,
+    title: String,
+    tags: Vec<i32>,
+    difficulty: f64,
     contents: ProblemContents,
     settings: ProblemSettings,
 }
@@ -207,7 +210,9 @@ pub async fn create(
 
     let res = web::block(move || {
         problem::create(
-            body.info.clone(),
+            body.title.clone(),
+            body.tags.clone(),
+            body.difficulty.clone(),
             body.contents.clone(),
             body.settings.clone(),
             pool,
@@ -224,7 +229,9 @@ pub async fn create(
 
 #[derive(Deserialize)]
 pub struct UpdateProblemBody {
-    new_info: Option<ProblemInfo>,
+    new_title: Option<String>,
+    new_tags: Option<Vec<i32>>,
+    new_difficulty: Option<f64>,
     new_contents: Option<ProblemContents>,
     new_settings: Option<ProblemSettings>,
 }
@@ -248,7 +255,9 @@ pub async fn update(
     let res = web::block(move || {
         problem::update(
             id,
-            body.new_info.clone(),
+            body.new_title.clone(),
+            body.new_tags.clone(),
+            body.new_difficulty.clone(),
             body.new_contents.clone(),
             body.new_settings.clone(),
             pool,

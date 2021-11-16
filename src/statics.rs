@@ -28,4 +28,6 @@ lazy_static! {
         file.read_to_string(&mut content).unwrap();
         toml::from_str(&content).unwrap()
     };
+    pub static ref PROBLEM_TAG_NAME_CACHE: RwLock<HashMap<i32, String>> =
+        RwLock::new(HashMap::new());
 }
