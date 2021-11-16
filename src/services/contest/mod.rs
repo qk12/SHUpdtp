@@ -366,3 +366,31 @@ pub fn update(
 
     Ok(())
 }
+
+pub fn get(
+    region: String,
+    user_id: Option<i32>,
+    pool: web::Data<Pool>,
+) -> ServiceResult<SlimContest> {
+    let conn = &db_connection(&pool)?;
+
+    use crate::schema::contests as contests_schema;
+    let raw_contest: RawContest = contests_schema::table
+        .filter(contests_schema::region.eq(region))
+        .first(conn)?;
+
+    let mut res = SlimContest::from(raw_contest);
+
+    let access_setting = region_access::read_access_setting(conn, res.region.clone())?;
+    if access_setting.hash.is_some() {
+        res.need_pass = true;
+    }
+
+    if let Some(inner_data) = user_id {
+        if region_access::check_acl(conn, inner_data, res.region.clone()).is_ok() {
+            res.is_registered = true;
+        }
+    }
+
+    Ok(res)
+}

@@ -225,3 +225,29 @@ pub async fn update(
 
     Ok(HttpResponse::Ok().json(&res))
 }
+
+#[get("/{region}")]
+pub async fn get(
+    web::Path(region): web::Path<String>,
+    pool: web::Data<Pool>,
+    logged_user: LoggedUser,
+) -> Result<HttpResponse, ServiceError> {
+    let res = web::block(move || {
+        contest::get(
+            region.clone(),
+            if let Some(user) = logged_user.0 {
+                Some(user.id)
+            } else {
+                None
+            },
+            pool,
+        )
+    })
+    .await
+    .map_err(|e| {
+        eprintln!("{}", e);
+        e
+    })?;
+
+    Ok(HttpResponse::Ok().json(&res))
+}
