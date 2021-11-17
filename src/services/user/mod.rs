@@ -1,10 +1,15 @@
+pub mod utils;
+
 use crate::models::users::*;
 use crate::models::utils::SizedList;
 use actix_web::web;
+use chrono::Duration;
 use diesel::prelude::*;
+use rand::Rng;
 use server_core::database::{db_connection, Pool};
 use server_core::errors::{ServiceError, ServiceResult};
 use server_core::utils::encryption;
+use server_core::utils::time::get_cur_naive_date_time;
 use std::fs;
 use std::io::prelude::*;
 
@@ -44,6 +49,8 @@ pub fn create(
             school: school,
             student_number: student_number,
             profile_picture: profile_picture_string,
+            reset_password_token_hash: None,
+            reset_password_token_expiration_time: None,
         })
         .execute(conn)?;
 
@@ -76,6 +83,7 @@ pub fn get(id: i32, pool: web::Data<Pool>) -> ServiceResult<OutUser> {
 
 pub fn update(
     id: i32,
+    role: String,
     new_username: Option<String>,
     new_password: Option<String>,
     new_email: Option<String>,
@@ -87,12 +95,16 @@ pub fn update(
 ) -> ServiceResult<()> {
     let conn = &db_connection(&pool)?;
 
-    let (new_salt, new_hash) = if let Some(inner_data) = new_password {
-        let salt = encryption::make_salt();
-        let hash = encryption::make_hash(&inner_data, &salt).to_vec();
-        (Some(salt), Some(hash))
-    } else {
+    let (new_salt, new_hash) = if role != "sup" && role != "admin" {
         (None, None)
+    } else {
+        if let Some(inner_data) = new_password {
+            let salt = encryption::make_salt();
+            let hash = encryption::make_hash(&inner_data, &salt).to_vec();
+            (Some(salt), Some(hash))
+        } else {
+            (None, None)
+        }
     };
 
     use crate::schema::users as users_schema;
@@ -461,6 +473,127 @@ pub fn batch_create(
     diesel::insert_into(users_schema::table)
         .values(&res)
         .on_conflict_do_nothing()
+        .execute(conn)?;
+
+    Ok(())
+}
+
+pub fn send_reset_password_token(email: String, pool: web::Data<Pool>) -> ServiceResult<()> {
+    let conn = &db_connection(&pool)?;
+
+    use crate::schema::users as users_schema;
+    let user: User = users_schema::table
+        .filter(users_schema::email.eq(email.clone()))
+        .first(conn)?;
+
+    let cur_time = get_cur_naive_date_time();
+    if let Some(expiration_time) = user.reset_password_token_expiration_time {
+        if cur_time < expiration_time {
+            let hint = "两小时之内只能发送一封验证邮件".to_string();
+            return Err(ServiceError::BadRequest(hint));
+        }
+    }
+
+    let mut rng = rand::thread_rng();
+    let reset_password_token = rng.gen_range(100000..999999);
+
+    let email_response = utils::send_email_token(email.clone(), reset_password_token.to_string());
+
+    match email_response {
+        Ok(_) => {
+            let reset_password_token_hash =
+                encryption::make_hash(&reset_password_token.to_string(), &user.salt.unwrap())
+                    .to_vec();
+
+            let expiration_time = cur_time + Duration::hours(2);
+
+            diesel::update(users_schema::table.filter(users_schema::email.eq(email)))
+                .set((
+                    users_schema::reset_password_token_hash.eq(Some(reset_password_token_hash)),
+                    users_schema::reset_password_token_expiration_time.eq(Some(expiration_time)),
+                ))
+                .execute(conn)?;
+        }
+        Err(e) => {
+            let hint = format!("Could not send email: {:?}", e);
+            return Err(ServiceError::BadRequest(hint));
+        }
+    }
+
+    Ok(())
+}
+
+pub fn reset_password_by_old_password(
+    id: i32,
+    old_password: String,
+    new_password: String,
+    pool: web::Data<Pool>,
+) -> ServiceResult<()> {
+    let conn = &db_connection(&pool)?;
+
+    use crate::schema::users as users_schema;
+    let user: User = users_schema::table
+        .filter(users_schema::id.eq(id))
+        .first(conn)?;
+
+    let hash = encryption::make_hash(&old_password, &user.salt.clone().unwrap()).to_vec();
+    if Some(hash) != user.hash {
+        let hint = "Password is wrong.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let new_hash = encryption::make_hash(&new_password, &user.salt.unwrap()).to_vec();
+
+    diesel::update(users_schema::table.filter(users_schema::id.eq(id)))
+        .set(users_schema::hash.eq(new_hash))
+        .execute(conn)?;
+
+    Ok(())
+}
+
+pub fn reset_password_by_email_token(
+    email: String,
+    token: String,
+    new_password: String,
+    pool: web::Data<Pool>,
+) -> ServiceResult<()> {
+    let conn = &db_connection(&pool)?;
+
+    use crate::schema::users as users_schema;
+    let user: User = users_schema::table
+        .filter(users_schema::email.eq(email.clone()))
+        .first(conn)?;
+
+    if user.reset_password_token_hash.is_none() {
+        let hint = "未发送验证码.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let expiration_time = user.reset_password_token_expiration_time.unwrap();
+    let cur_time = get_cur_naive_date_time();
+    if expiration_time < cur_time {
+        let hint = "验证码已过期, 请重新发送验证码.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let token_hash = encryption::make_hash(&token, &user.salt.unwrap()).to_vec();
+    if Some(token_hash) != user.reset_password_token_hash {
+        let hint = "验证码错误.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let (salt, hash) = {
+        let salt = encryption::make_salt();
+        let hash = encryption::make_hash(&new_password, &salt).to_vec();
+        (Some(salt), Some(hash))
+    };
+
+    diesel::update(users_schema::table.filter(users_schema::email.eq(email)))
+        .set((
+            users_schema::salt.eq(salt),
+            users_schema::hash.eq(hash.clone()),
+            users_schema::reset_password_token_hash.eq(hash), //验证码使用过即失效
+        ))
         .execute(conn)?;
 
     Ok(())

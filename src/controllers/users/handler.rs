@@ -139,6 +139,7 @@ pub async fn update(
     let res = web::block(move || {
         user::update(
             id,
+            cur_user.role,
             body.new_username.clone(),
             body.new_password.clone(),
             body.new_email.clone(),
@@ -360,4 +361,94 @@ pub async fn batch_create(
         })?;
 
     Ok(HttpResponse::Ok().json(()))
+}
+
+#[get("/reset_password/{email}")]
+pub async fn send_reset_password_token(
+    web::Path(email): web::Path<String>,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, ServiceError> {
+    let res = web::block(move || user::send_reset_password_token(email.clone(), pool))
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
+
+    Ok(HttpResponse::Ok().json(&res))
+}
+
+#[derive(Clone, Deserialize)]
+pub struct ByOldPasswordBody {
+    id: i32,
+    old_password: String,
+    new_password: String,
+}
+
+#[derive(Clone, Deserialize)]
+pub struct ByEmailBody {
+    email: String,
+    token: String,
+    new_password: String,
+}
+
+#[derive(Deserialize)]
+pub struct ResetPasswordBody {
+    by_old_password: bool,
+    by_old_password_body: Option<ByOldPasswordBody>,
+    by_email: bool,
+    by_email_body: Option<ByEmailBody>,
+}
+
+#[post("/reset_password")]
+pub async fn reset_password(
+    body: web::Json<ResetPasswordBody>,
+    logged_user: LoggedUser,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, ServiceError> {
+    let res;
+
+    if body.by_old_password {
+        if logged_user.0.is_none() {
+            return Err(ServiceError::Unauthorized);
+        }
+        let cur_user = logged_user.0.unwrap();
+        let by_old_password_body = body.by_old_password_body.clone().unwrap();
+        if cur_user.id != by_old_password_body.id {
+            let hint = "No permission.".to_string();
+            return Err(ServiceError::BadRequest(hint));
+        }
+
+        res = web::block(move || {
+            user::reset_password_by_old_password(
+                by_old_password_body.id,
+                by_old_password_body.old_password.clone(),
+                by_old_password_body.new_password.clone(),
+                pool,
+            )
+        })
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
+    } else {
+        let by_email_body = body.by_email_body.clone().unwrap();
+
+        res = web::block(move || {
+            user::reset_password_by_email_token(
+                by_email_body.email,
+                by_email_body.token,
+                by_email_body.new_password,
+                pool,
+            )
+        })
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
+    };
+
+    Ok(HttpResponse::Ok().json(&res))
 }

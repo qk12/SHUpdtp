@@ -2,7 +2,7 @@ use crate::schema::*;
 use actix_identity::RequestIdentity;
 use actix_web::dev::Payload;
 use actix_web::{Error, FromRequest, HttpRequest};
-use chrono::NaiveDate;
+use chrono::*;
 use server_core::utils::encryption;
 use shrinkwraprs::Shrinkwrap;
 
@@ -18,6 +18,8 @@ pub struct User {
     pub school: Option<String>,
     pub student_number: Option<String>,
     pub profile_picture: String,
+    pub reset_password_token_hash: Option<Vec<u8>>,
+    pub reset_password_token_expiration_time: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Insertable)]
@@ -32,6 +34,8 @@ pub struct InsertableUser {
     pub school: Option<String>,
     pub student_number: Option<String>,
     pub profile_picture: String,
+    pub reset_password_token_hash: Option<Vec<u8>>,
+    pub reset_password_token_expiration_time: Option<NaiveDateTime>,
 }
 
 #[derive(Serialize)]
@@ -191,6 +195,8 @@ impl From<BatchCreateUserBody> for InsertableUser {
             school: school,
             student_number: Some(body.student_number),
             profile_picture: serde_json::to_string(&profile_picture).unwrap(),
+            reset_password_token_hash: None,
+            reset_password_token_expiration_time: None,
         }
     }
 }

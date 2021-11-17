@@ -30,4 +30,5 @@ lazy_static! {
     };
     pub static ref PROBLEM_TAG_NAME_CACHE: RwLock<HashMap<i32, String>> =
         RwLock::new(HashMap::new());
+    pub static ref ADMIN_EMAIL: RwLock<String> = RwLock::new(String::from("1987258436@qq.com"));
 }

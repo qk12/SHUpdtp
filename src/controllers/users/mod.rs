@@ -18,6 +18,8 @@ pub fn route(cfg: &mut web::ServiceConfig) {
             .service(handler::get_submissions_count)
             .service(handler::get_submissions_time)
             .service(handler::upload_profile_picture)
-            .service(handler::batch_create),
+            .service(handler::batch_create)
+            .service(handler::reset_password)
+            .service(handler::send_reset_password_token),
     );
 }

@@ -25,6 +25,9 @@ actix-multipart = "0.3"
 actix-http = "2.1"
 actix-files = "0.5.0"
 
+# Email
+lettre = "0.10.0-rc.4"
+
 # ORM and Query Builder
 diesel = { version = "1.4.7", features = ["postgres", "uuidv07", "chrono", "r2d2"] }
 

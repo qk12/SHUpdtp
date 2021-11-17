@@ -123,6 +123,8 @@ table! {
         school -> Nullable<Text>,
         student_number -> Nullable<Text>,
         profile_picture -> Text,
+        reset_password_token_hash -> Nullable<Bytea>,
+        reset_password_token_expiration_time -> Nullable<Timestamp>,
     }
 }
 
