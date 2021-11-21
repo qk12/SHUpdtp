@@ -9,7 +9,7 @@ use serde_qs::actix::QsQuery;
 use server_core::database::Pool;
 use server_core::errors::ServiceError;
 
-#[post("")]
+#[post("/batch_create")]
 pub async fn batch_create(
     //logged_user: LoggedUser,
     mut payload: Multipart,
@@ -193,7 +193,7 @@ pub struct CreateProblemBody {
     settings: ProblemSettings,
 }
 
-#[post("/create")]
+#[post("")]
 pub async fn create(
     body: web::Json<CreateProblemBody>,
     pool: web::Data<Pool>,
@@ -283,6 +283,74 @@ pub async fn get_test_case(
     query: web::Query<GetTestCaseParams>,
 ) -> Result<NamedFile, ServiceError> {
     let res = web::block(move || problem::get_test_case(id, test_case_id, query.input))
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
+
+    Ok(res)
+}
+
+#[post("/{id}/test_case")]
+pub async fn insert_test_cases(
+    web::Path(id): web::Path<i32>,
+    logged_user: LoggedUser,
+    mut payload: Multipart,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, ServiceError> {
+    if logged_user.0.is_none() {
+        return Err(ServiceError::Unauthorized);
+    }
+    let cur_user = logged_user.0.unwrap();
+    if cur_user.role != "sup" && cur_user.role != "admin" {
+        let hint = "No permission.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let mut bytes = web::BytesMut::new();
+    let mut filename = None;
+    while let Ok(Some(mut field)) = payload.try_next().await {
+        let content_type = field.content_disposition().unwrap();
+        if filename.is_none() {
+            filename = Some(content_type.get_filename().unwrap().to_owned());
+        } else {
+            if filename.clone().unwrap() != content_type.get_filename().unwrap() {
+                continue;
+            }
+        }
+
+        while let Some(chunk) = field.next().await {
+            let data = chunk.unwrap();
+            bytes.extend_from_slice(&data);
+        }
+    }
+
+    let res = web::block(move || problem::insert_test_cases(id, &bytes, pool))
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
+
+    Ok(HttpResponse::Ok().json(res))
+}
+
+#[get("/{id}/test_case")]
+pub async fn get_test_cases(
+    web::Path(id): web::Path<i32>,
+    logged_user: LoggedUser,
+) -> Result<NamedFile, ServiceError> {
+    if logged_user.0.is_none() {
+        return Err(ServiceError::Unauthorized);
+    }
+    let cur_user = logged_user.0.unwrap();
+    if cur_user.role != "sup" && cur_user.role != "admin" {
+        let hint = "No permission.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let res = web::block(move || problem::get_test_cases(id))
         .await
         .map_err(|e| {
             eprintln!("{}", e);

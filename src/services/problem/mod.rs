@@ -24,7 +24,7 @@ pub fn batch_create(
     file.write_all(zip_buf).expect("Error writing zip.");
 
     let mut p = Command::new("unzip")
-        .args(&["-o", &file_path, "-d", &tmp_folder])
+        .args(&["-q", "-o", &file_path, "-d", &tmp_folder])
         .spawn()?;
     p.wait()?;
 
@@ -410,4 +410,78 @@ pub fn get_test_case(id: i32, test_case_id: i32, input: bool) -> ServiceResult<N
     };
 
     Ok(NamedFile::open(file_path)?)
+}
+
+pub fn insert_test_cases(id: i32, zip_buf: &[u8], pool: web::Data<Pool>) -> ServiceResult<()> {
+    let tmp_folder = String::from("data/tmp/") + &Uuid::new_v4().to_hyphenated().to_string();
+    let file_path = tmp_folder.clone() + "/test_cases.zip";
+    fs::create_dir_all(&tmp_folder)?;
+
+    let mut file = fs::File::create(file_path.clone())?;
+    file.write_all(zip_buf).expect("Error writing zip.");
+
+    let mut p = Command::new("unzip")
+        .args(&["-o", &file_path, "-d", &tmp_folder])
+        .spawn()?;
+    p.wait()?;
+
+    fs::remove_file(file_path)?;
+
+    let conn = &db_connection(&pool)?;
+    use crate::schema::problems as problems_schema;
+
+    let problem: RawProblem = problems_schema::table
+        .filter(problems_schema::id.eq(id))
+        .first(conn)?;
+
+    let mut settings: ProblemSettings = serde_json::from_str(&problem.settings).unwrap();
+
+    match utils::prepare_test_cases(&(tmp_folder.clone() + "/TestCases"), settings.is_spj) {
+        Ok(test_case_count) => {
+            fs::remove_dir_all(format!("data/test_cases/{}", id)).unwrap_or({});
+
+            fs::rename(
+                &(tmp_folder.clone() + "/TestCases"),
+                format!("data/test_cases/{}", id),
+            )?;
+
+            settings.test_case_count = Some(test_case_count);
+
+            diesel::update(problems_schema::table.filter(problems_schema::id.eq(id)))
+                .set(problems_schema::settings.eq(serde_json::to_string(&settings).unwrap()))
+                .execute(conn)?;
+        }
+        Err(_) => {
+            let hint = "Test case insert failed.".to_string();
+            return Err(ServiceError::BadRequest(hint));
+        }
+    }
+
+    fs::remove_dir_all(&tmp_folder)?;
+
+    Ok(())
+}
+
+pub fn get_test_cases(id: i32) -> ServiceResult<NamedFile> {
+    let file_path = format!("data/test_cases/{}", id);
+    let target_path = format!("data/tmp/{}.zip", id);
+
+    fs::remove_file(target_path.clone()).unwrap_or({});
+
+    let mut p = Command::new("zip")
+        .args(&[
+            "-q",
+            "-r",
+            "-j",
+            &target_path,
+            &file_path,
+            "-i",
+            "*.in",
+            "-i",
+            "*.out",
+        ])
+        .spawn()?;
+    p.wait()?;
+
+    Ok(NamedFile::open(target_path)?)
 }
