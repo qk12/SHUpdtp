@@ -1,7 +1,5 @@
-use crate::models::announcements::*;
 use crate::models::users::LoggedUser;
 use crate::services::announcement;
-use actix_identity::Identity;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use chrono::*;
 use server_core::database::Pool;
@@ -157,6 +155,21 @@ pub async fn get_list(
         eprintln!("{}", e);
         e
     })?;
+
+    Ok(HttpResponse::Ok().json(&res))
+}
+
+#[get("/{id}")]
+pub async fn get(
+    web::Path(id): web::Path<i32>,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, ServiceError> {
+    let res = web::block(move || announcement::get(id, pool))
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
 
     Ok(HttpResponse::Ok().json(&res))
 }

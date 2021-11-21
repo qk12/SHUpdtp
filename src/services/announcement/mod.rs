@@ -71,7 +71,7 @@ pub fn get_list(
     offset: i32,
     is_released: bool,
     pool: web::Data<Pool>,
-) -> ServiceResult<SizedList<Announcement>> {
+) -> ServiceResult<SizedList<OutAnnouncement>> {
     let title_filter = if let Some(inner_data) = title_filter {
         Some(String::from("%") + &inner_data.as_str().replace(" ", "%") + "%")
     } else {
@@ -93,41 +93,54 @@ pub fn get_list(
         .is_not_null()
         .and(announcements_schema::release_time.le(get_cur_naive_date_time()));
 
-    let final_total;
-    let final_out_announcements;
+    let total;
+    let announcements;
 
     if is_released {
         let target = announcements_schema::table
             .filter(id_filter_predicate)
             .filter(title_filter_predicate.clone())
             .filter(release_time_predicate);
-        let total: i64 = target.clone().count().get_result(conn)?;
-        final_total = total;
 
-        let out_announcements: Vec<Announcement> = target
+        total = target.clone().count().get_result(conn)?;
+
+        announcements = target
             .offset(offset.into())
             .limit(limit.into())
             .order(announcements_schema::release_time.nullable().desc())
-            .load(conn)?;
-        final_out_announcements = out_announcements;
+            .load::<Announcement>(conn)?;
     } else {
         let target = announcements_schema::table
             .filter(id_filter_predicate)
             .filter(title_filter_predicate);
 
-        let total: i64 = target.clone().count().get_result(conn)?;
-        final_total = total;
+        total = target.clone().count().get_result(conn)?;
 
-        let out_announcements: Vec<Announcement> = target
+        announcements = target
             .offset(offset.into())
             .limit(limit.into())
             .order(announcements_schema::release_time.nullable().desc())
-            .load(conn)?;
-        final_out_announcements = out_announcements;
+            .load::<Announcement>(conn)?;
     };
 
+    let mut out_announcements = Vec::new();
+    for announcement in announcements {
+        out_announcements.push(OutAnnouncement::from(announcement));
+    }
+
     Ok(SizedList {
-        total: final_total,
-        list: final_out_announcements,
+        total: total,
+        list: out_announcements,
     })
+}
+
+pub fn get(id: i32, pool: web::Data<Pool>) -> ServiceResult<Announcement> {
+    let conn = &db_connection(&pool)?;
+
+    use crate::schema::announcements as announcements_schema;
+    let announcement: Announcement = announcements_schema::table
+        .filter(announcements_schema::id.eq(id))
+        .first(conn)?;
+
+    Ok(announcement)
 }

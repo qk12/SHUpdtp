@@ -36,7 +36,18 @@ pub struct OutAnnouncement {
     pub id: i32,
     pub title: String,
     pub author: String,
-    pub contents: String,
-    pub release_time: NaiveDateTime,
+    pub release_time: Option<NaiveDateTime>,
     pub last_update_time: NaiveDateTime,
+}
+
+impl From<Announcement> for OutAnnouncement {
+    fn from(announcement: Announcement) -> Self {
+        Self {
+            id: announcement.id,
+            title: announcement.title,
+            author: announcement.author,
+            release_time: announcement.release_time,
+            last_update_time: announcement.last_update_time,
+        }
+    }
 }

@@ -8,6 +8,7 @@ pub fn route(cfg: &mut web::ServiceConfig) {
             .service(handler::create)
             .service(handler::delete)
             .service(handler::update)
-            .service(handler::get_list),
+            .service(handler::get_list)
+            .service(handler::get),
     );
 }
