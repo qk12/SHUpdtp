@@ -102,9 +102,9 @@ pub async fn get_list(pool: web::Data<Pool>) -> Result<HttpResponse, ServiceErro
     Ok(HttpResponse::Ok().json(&res))
 }
 
-#[get("/apply")]
-pub async fn apply(pool: web::Data<Pool>) -> Result<HttpResponse, ServiceError> {
-    let res = web::block(move || problem_tag::apply(pool))
+#[get("/apply_changes")]
+pub async fn apply_changes(pool: web::Data<Pool>) -> Result<HttpResponse, ServiceError> {
+    let res = web::block(move || problem_tag::apply_changes(pool))
         .await
         .map_err(|e| {
             eprintln!("{}", e);

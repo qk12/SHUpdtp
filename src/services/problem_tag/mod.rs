@@ -50,7 +50,7 @@ pub fn get_list(pool: web::Data<Pool>) -> ServiceResult<SizedList<ProblemTag>> {
     })
 }
 
-pub fn apply(pool: web::Data<Pool>) -> ServiceResult<()> {
+pub fn apply_changes(pool: web::Data<Pool>) -> ServiceResult<()> {
     let conn = &db_connection(&pool)?;
 
     use crate::schema::problem_tags as problem_tags_schema;
