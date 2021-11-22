@@ -1,5 +1,6 @@
 pub mod announcements;
 pub mod contests;
+pub mod groups;
 pub mod judge_servers;
 pub mod problem_sets;
 pub mod problem_tags;

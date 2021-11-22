@@ -31,6 +31,21 @@ table! {
 }
 
 table! {
+    group_links (group_id, user_id) {
+        group_id -> Int4,
+        user_id -> Int4,
+    }
+}
+
+table! {
+    groups (id) {
+        id -> Int4,
+        title -> Text,
+        introduction -> Nullable<Text>,
+    }
+}
+
+table! {
     problem_sets (region) {
         region -> Text,
         title -> Text,
@@ -132,6 +147,8 @@ allow_tables_to_appear_in_same_query!(
     access_control_list,
     announcements,
     contests,
+    group_links,
+    groups,
     problem_sets,
     problem_tags,
     problems,

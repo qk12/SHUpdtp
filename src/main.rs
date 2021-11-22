@@ -78,6 +78,7 @@ async fn main() -> std::io::Result<()> {
             .configure(controllers::contests::route)
             .configure(controllers::announcements::route)
             .configure(controllers::problem_tags::route)
+            .configure(controllers::groups::route)
     })
     .bind(("0.0.0.0", opt.port))
     .unwrap()

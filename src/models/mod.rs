@@ -1,6 +1,8 @@
 pub mod access_control_list;
 pub mod announcements;
 pub mod contests;
+pub mod group_links;
+pub mod groups;
 pub mod judge_servers;
 pub mod languages;
 pub mod problem_sets;
