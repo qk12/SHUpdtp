@@ -5,6 +5,7 @@ use crate::models::problems::*;
 use crate::models::region_links::*;
 use crate::models::regions::*;
 use crate::models::utils::SizedList;
+use actix_files::NamedFile;
 use actix_web::web;
 use diesel::prelude::*;
 use server_core::database::{db_connection, Pool};
@@ -323,4 +324,29 @@ pub fn delete_problem(region: String, inner_id: i32, pool: web::Data<Pool>) -> S
     .execute(conn)?;
 
     Ok(())
+}
+
+pub fn get_linked_problem_test_case(
+    region: String,
+    inner_id: i32,
+    test_case_id: i32,
+    input: bool,
+    pool: web::Data<Pool>,
+) -> ServiceResult<NamedFile> {
+    let conn = &db_connection(&pool)?;
+
+    use crate::schema::region_links as region_links_schema;
+    let problem_id: i32 = region_links_schema::table
+        .filter(region_links_schema::region.eq(region))
+        .filter(region_links_schema::inner_id.eq(inner_id))
+        .select(region_links_schema::problem_id)
+        .first(conn)?;
+
+    let file_path = if input {
+        format!("data/test_cases/{}/{}.in", problem_id, test_case_id)
+    } else {
+        format!("data/test_cases/{}/{}.out", problem_id, test_case_id)
+    };
+
+    Ok(NamedFile::open(file_path)?)
 }

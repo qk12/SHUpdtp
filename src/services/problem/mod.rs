@@ -402,16 +402,6 @@ pub fn update(
     Ok(())
 }
 
-pub fn get_test_case(id: i32, test_case_id: i32, input: bool) -> ServiceResult<NamedFile> {
-    let file_path = if input {
-        format!("data/test_cases/{}/{}.in", id, test_case_id)
-    } else {
-        format!("data/test_cases/{}/{}.out", id, test_case_id)
-    };
-
-    Ok(NamedFile::open(file_path)?)
-}
-
 pub fn insert_test_cases(id: i32, zip_buf: &[u8], pool: web::Data<Pool>) -> ServiceResult<()> {
     let tmp_folder = String::from("data/tmp/") + &Uuid::new_v4().to_hyphenated().to_string();
     let file_path = tmp_folder.clone() + "/test_cases.zip";

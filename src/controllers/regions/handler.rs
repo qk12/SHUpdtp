@@ -2,6 +2,7 @@ use crate::auth::region::*;
 use crate::judge_actor::JudgeActorAddr;
 use crate::models::users::LoggedUser;
 use crate::services::region;
+use actix_files::NamedFile;
 use actix_web::{delete, get, post, put, web, HttpResponse};
 use serde_qs::actix::QsQuery;
 use server_core::database::Pool;
@@ -190,4 +191,27 @@ pub async fn delete_problem(
         })?;
 
     Ok(HttpResponse::Ok().json(&res))
+}
+
+#[derive(Deserialize)]
+pub struct GetTestCaseParams {
+    input: bool,
+}
+
+#[get("/{region}/{inner_id}/test_case/{test_case_id}")]
+pub async fn get_linked_problem_test_case(
+    web::Path((region, inner_id, test_case_id)): web::Path<(String, i32, i32)>,
+    query: web::Query<GetTestCaseParams>,
+    pool: web::Data<Pool>,
+) -> Result<NamedFile, ServiceError> {
+    let res = web::block(move || {
+        region::get_linked_problem_test_case(region, inner_id, test_case_id, query.input, pool)
+    })
+    .await
+    .map_err(|e| {
+        eprintln!("{}", e);
+        e
+    })?;
+
+    Ok(res)
 }
