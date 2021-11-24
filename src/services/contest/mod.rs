@@ -3,6 +3,7 @@ pub mod utils;
 use crate::auth::region as region_access;
 use crate::models::access_control_list::*;
 use crate::models::contests::*;
+use crate::models::groups::{Group, OutGroup};
 use crate::models::ranks::*;
 use crate::models::region_access_settings::*;
 use crate::models::regions::*;
@@ -11,6 +12,7 @@ use crate::services::rank::utils::update_acm_rank_cache;
 use crate::statics::ACM_RANK_CACHE;
 use actix_web::web;
 use chrono::*;
+use diesel::pg::expression::dsl::any;
 use diesel::prelude::*;
 use server_core::database::{db_connection, Pool};
 use server_core::errors::{ServiceError, ServiceResult};
@@ -21,6 +23,7 @@ pub fn create(
     region: String,
     title: String,
     introduction: Option<String>,
+    self_type: String,
     start_time: NaiveDateTime,
     end_time: Option<NaiveDateTime>,
     seal_time: Option<NaiveDateTime>,
@@ -37,7 +40,7 @@ pub fn create(
     diesel::insert_into(regions_schema::table)
         .values(&Region {
             name: region.clone(),
-            self_type: "contest".to_owned(),
+            self_type: self_type,
             title: title.clone(),
             has_access_setting: true,
             introduction: introduction.clone(),
@@ -79,8 +82,9 @@ pub fn create(
     use crate::schema::access_control_list as access_control_list_schema;
     diesel::insert_into(access_control_list_schema::table)
         .values(&AccessControlListColumn {
+            self_type: "user".to_string(),
             region,
-            user_id,
+            id: user_id,
             is_unrated: Some(true),
             is_manager: true,
         })
@@ -206,8 +210,9 @@ pub fn register(
     use crate::schema::access_control_list as access_control_list_schema;
     diesel::insert_into(access_control_list_schema::table)
         .values(&AccessControlListColumn {
+            self_type: "user".to_string(),
             region,
-            user_id,
+            id: user_id,
             is_unrated,
             is_manager: false,
         })
@@ -393,4 +398,64 @@ pub fn get(
     }
 
     Ok(res)
+}
+
+pub fn insert_groups(
+    region: String,
+    group_ids: Vec<i32>,
+    pool: web::Data<Pool>,
+) -> ServiceResult<()> {
+    let conn = &db_connection(&pool)?;
+
+    use crate::schema::regions as regions_schema;
+    let contest_type = regions_schema::table
+        .filter(regions_schema::name.eq(region.clone()))
+        .select(regions_schema::self_type)
+        .first::<String>(conn)?;
+
+    if contest_type != "group_contest" {
+        let hint = "比赛类型不为小组赛.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let mut res = Vec::new();
+    for group_id in group_ids {
+        res.push(AccessControlListColumn {
+            self_type: "group".to_string(),
+            id: group_id,
+            region: region.clone(),
+            is_unrated: Some(false),
+            is_manager: false,
+        });
+    }
+
+    use crate::schema::access_control_list as access_control_list_schema;
+    diesel::insert_into(access_control_list_schema::table)
+        .values(&res)
+        .execute(conn)?;
+
+    Ok(())
+}
+
+pub fn get_linked_groups(region: String, pool: web::Data<Pool>) -> ServiceResult<Vec<OutGroup>> {
+    let conn = &db_connection(&pool)?;
+
+    use crate::schema::access_control_list as access_control_list_schema;
+    let group_ids = access_control_list_schema::table
+        .filter(access_control_list_schema::region.eq(region))
+        .filter(access_control_list_schema::self_type.eq("group"))
+        .select(access_control_list_schema::id)
+        .load::<i32>(conn)?;
+
+    use crate::schema::groups as groups_schema;
+    let groups = groups_schema::table
+        .filter(groups_schema::id.eq(any(group_ids)))
+        .load::<Group>(conn)?;
+
+    let mut out_groups = Vec::new();
+    for group in groups {
+        out_groups.push(OutGroup::from(group));
+    }
+
+    Ok(out_groups)
 }

@@ -1,5 +1,7 @@
+use crate::models::access_control_list::AccessControlListColumn;
 use crate::models::region_access_settings::RegionAccessSetting;
 use crate::models::users::LoggedUser;
+use crate::services::group::utils::is_in_group;
 use crate::services::region::utils::get_self_type;
 use actix_web::web;
 use diesel::prelude::*;
@@ -35,25 +37,31 @@ pub fn read_access_setting(
 pub fn check_acl(conn: &PgConnection, user_id: i32, region: String) -> ServiceResult<()> {
     use crate::schema::access_control_list as access_control_list_schema;
 
-    if access_control_list_schema::table
-        .filter(access_control_list_schema::user_id.eq(user_id))
+    let acls: Vec<AccessControlListColumn> = access_control_list_schema::table
         .filter(access_control_list_schema::region.eq(region))
-        .count()
-        .get_result::<i64>(conn)?
-        == 1
-    {
-        Ok(())
-    } else {
-        let hint = "Not in ACL.".to_owned();
-        Err(ServiceError::UnauthorizedWithHint(hint))
+        .load(conn)?;
+
+    for acl in acls {
+        if acl.self_type == "user" {
+            if acl.id == user_id {
+                return Ok(());
+            }
+        } else {
+            if is_in_group(conn, acl.id, user_id)? {
+                return Ok(());
+            }
+        }
     }
+
+    let hint = "Not in ACL.".to_owned();
+    Err(ServiceError::UnauthorizedWithHint(hint))
 }
 
 pub fn is_manager(conn: &PgConnection, user_id: i32, region: String) -> ServiceResult<bool> {
     use crate::schema::access_control_list as access_control_list_schema;
 
     if access_control_list_schema::table
-        .filter(access_control_list_schema::user_id.eq(user_id))
+        .filter(access_control_list_schema::id.eq(user_id))
         .filter(access_control_list_schema::region.eq(region))
         .filter(access_control_list_schema::is_manager.eq(true))
         .count()

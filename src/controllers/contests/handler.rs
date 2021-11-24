@@ -12,6 +12,7 @@ pub struct CreateContestBody {
     region: String,
     title: String,
     introduction: Option<String>,
+    self_type: String,
     start_time: NaiveDateTime,
     end_time: Option<NaiveDateTime>,
     seal_time: Option<NaiveDateTime>,
@@ -40,6 +41,7 @@ pub async fn create(
             body.region.clone(),
             body.title.clone(),
             body.introduction.clone(),
+            body.self_type.clone(),
             body.start_time.clone(),
             body.end_time.clone(),
             body.seal_time.clone(),
@@ -248,6 +250,62 @@ pub async fn get(
         eprintln!("{}", e);
         e
     })?;
+
+    Ok(HttpResponse::Ok().json(&res))
+}
+
+#[derive(Deserialize)]
+pub struct InsertGroupIntoContestBody {
+    group_ids: Vec<i32>,
+}
+
+#[post("/{region}")]
+pub async fn insert_groups(
+    web::Path(region): web::Path<String>,
+    body: web::Json<InsertGroupIntoContestBody>,
+    logged_user: LoggedUser,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, ServiceError> {
+    if logged_user.0.is_none() {
+        return Err(ServiceError::Unauthorized);
+    }
+    let cur_user = logged_user.0.unwrap();
+    if cur_user.role != "sup" && cur_user.role != "admin" {
+        let hint = "No permission.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let res = web::block(move || contest::insert_groups(region, body.group_ids.clone(), pool))
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
+
+    Ok(HttpResponse::Ok().json(&res))
+}
+
+#[get("/{region}/groups")]
+pub async fn get_linked_groups(
+    web::Path(region): web::Path<String>,
+    logged_user: LoggedUser,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, ServiceError> {
+    if logged_user.0.is_none() {
+        return Err(ServiceError::Unauthorized);
+    }
+    let cur_user = logged_user.0.unwrap();
+    if cur_user.role != "sup" && cur_user.role != "admin" {
+        let hint = "No permission.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let res = web::block(move || contest::get_linked_groups(region, pool))
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
 
     Ok(HttpResponse::Ok().json(&res))
 }

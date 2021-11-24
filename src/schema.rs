@@ -1,6 +1,7 @@
 table! {
-    access_control_list (region, user_id) {
-        user_id -> Int4,
+    access_control_list (self_type, id, region) {
+        self_type -> Text,
+        id -> Int4,
         region -> Text,
         is_unrated -> Nullable<Bool>,
         is_manager -> Bool,

@@ -11,6 +11,8 @@ pub fn route(cfg: &mut web::ServiceConfig) {
             .service(handler::get_acm_rank)
             .service(handler::delete)
             .service(handler::update)
-            .service(handler::get),
+            .service(handler::get)
+            .service(handler::insert_groups)
+            .service(handler::get_linked_groups),
     );
 }

@@ -96,7 +96,7 @@ fn build_acm_rank_column(
     is_final: bool,
 ) -> ServiceResult<ACMRankColumn> {
     let region = access_control_list_column.region;
-    let user_id = access_control_list_column.user_id;
+    let user_id = access_control_list_column.id;
     let is_unrated = access_control_list_column.is_unrated;
 
     use crate::schema::users as users_schema;

@@ -1,3 +1,5 @@
+pub mod utils;
+
 use crate::models::group_links::*;
 use crate::models::groups::*;
 use crate::models::utils::SizedList;
