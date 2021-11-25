@@ -351,13 +351,13 @@ pub fn create(
     contents: ProblemContents,
     settings: ProblemSettings,
     pool: web::Data<Pool>,
-) -> ServiceResult<()> {
+) -> ServiceResult<i32> {
     let conn = &db_connection(&pool)?;
 
     use crate::schema::problems as problems_schema;
     diesel::insert_into(problems_schema::table)
         .values(&InsertableProblem {
-            title: title,
+            title: title.clone(),
             tags: tags,
             difficulty: difficulty,
             contents: serde_json::to_string(&contents).unwrap(),
@@ -366,7 +366,12 @@ pub fn create(
         })
         .execute(conn)?;
 
-    Ok(())
+    let problem_id = problems_schema::table
+        .filter(problems_schema::title.eq(title))
+        .select(problems_schema::id)
+        .first::<i32>(conn)?;
+
+    Ok(problem_id)
 }
 
 pub fn update(
