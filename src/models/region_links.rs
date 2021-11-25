@@ -34,6 +34,7 @@ pub struct RawLinkedProblemColumn {
 pub struct LinkedProblemColumn {
     pub region: String,
     pub inner_id: i32,
+    pub is_accepted: bool,
     pub out_problem: problems::OutProblem,
     pub submit_times: i32,
     pub accept_times: i32,
@@ -45,6 +46,7 @@ use server_core::database::*;
 pub fn get_column_from_raw(
     conn: &PooledConnection,
     raw: RawLinkedProblemColumn,
+    user_id: Option<i32>,
 ) -> ServiceResult<LinkedProblemColumn> {
     let statistic = get_results(conn, raw.region.clone(), raw.problem_id)?;
 
@@ -61,6 +63,11 @@ pub fn get_column_from_raw(
     Ok(LinkedProblemColumn {
         region: raw.region,
         inner_id: raw.inner_id,
+        is_accepted: if let Some(inner_id) = user_id {
+            statistic.accepted_user_list.contains(&inner_id)
+        } else {
+            false
+        },
         out_problem: problems::OutProblem {
             id: raw.problem_id,
             info: problems::ProblemInfo {

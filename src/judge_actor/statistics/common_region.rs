@@ -5,6 +5,7 @@ use crate::statics::RESULT_STATISTICS_CACHE;
 use diesel::prelude::*;
 use server_core::database::PooledConnection;
 use server_core::errors::*;
+use std::collections::HashSet;
 
 pub fn update_results(
     conn: &PooledConnection,
@@ -38,6 +39,7 @@ fn count_results(conn: &PooledConnection, region: &str, problem_id: i32) -> Serv
     let mut statistics = SubmissionStatistics {
         problem_id,
         region: region.to_owned(),
+        accepted_user_list: HashSet::new(),
         submit_times: 0,
         accept_times: 0,
         error_times: 0,
@@ -75,6 +77,12 @@ fn count_results(conn: &PooledConnection, region: &str, problem_id: i32) -> Serv
 }
 
 fn update_submission_statistics(statistics: &mut SubmissionStatistics, submission: Submission) {
+    if let Some(is_accepted) = submission.is_accepted {
+        if is_accepted {
+            statistics.accepted_user_list.insert(submission.user_id);
+        }
+    }
+
     if let Some(result) = submission.result {
         if let Some(is_accepted) = result.is_accepted {
             if is_accepted {

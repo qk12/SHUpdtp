@@ -3,11 +3,13 @@ use crate::statics::RESULT_STATISTICS_CACHE;
 use diesel::prelude::*;
 use server_core::database::*;
 use server_core::errors::ServiceResult;
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubmissionStatistics {
     pub problem_id: i32,
     pub region: String,
+    pub accepted_user_list: HashSet<i32>,
     pub submit_times: i32,
     pub accept_times: i32,
     pub error_times: i32,
@@ -57,6 +59,7 @@ fn count_results(conn: &PooledConnection, region: &str, problem_id: i32) -> Serv
     let mut statistics = SubmissionStatistics {
         problem_id,
         region: region.to_owned(),
+        accepted_user_list: HashSet::new(),
         submit_times: 0,
         accept_times: 0,
         error_times: 0,
@@ -94,6 +97,12 @@ fn count_results(conn: &PooledConnection, region: &str, problem_id: i32) -> Serv
 }
 
 fn update_submission_statistics(statistics: &mut SubmissionStatistics, submission: Submission) {
+    if let Some(is_accepted) = submission.is_accepted {
+        if is_accepted {
+            statistics.accepted_user_list.insert(submission.user_id);
+        }
+    }
+
     if let Some(result) = submission.result {
         if let Some(is_accepted) = result.is_accepted {
             if is_accepted {

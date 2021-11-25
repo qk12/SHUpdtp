@@ -98,6 +98,7 @@ pub fn insert_problems(
 
 pub fn get_linked_problem_column_list(
     region: String,
+    user_id: Option<i32>,
     inner_id_filter: Option<i32>,
     problem_id_filter: Option<i32>,
     title_filter: Option<String>,
@@ -203,7 +204,7 @@ pub fn get_linked_problem_column_list(
     let out_columns = {
         let mut res = Vec::new();
         for column in columns {
-            res.push(get_column_from_raw(conn, column)?);
+            res.push(get_column_from_raw(conn, column, user_id)?);
         }
         res
     };

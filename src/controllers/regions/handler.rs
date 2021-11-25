@@ -88,9 +88,16 @@ pub async fn get_linked_problem_column_list(
 ) -> Result<HttpResponse, ServiceError> {
     check_view_right(pool.clone(), logged_user.clone(), region.clone())?;
 
+    let user_id = if let Some(cur_user) = logged_user.0 {
+        Some(cur_user.id)
+    } else {
+        None
+    };
+
     let res = web::block(move || {
         region::get_linked_problem_column_list(
             region,
+            user_id,
             query.inner_id_filter,
             query.problem_id_filter,
             query.title_filter.clone(),
