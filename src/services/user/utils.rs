@@ -13,7 +13,7 @@ pub fn send_email_token(email: String, token: String) -> Result<Response, Error>
     );
 
     let smtp_username = "1987258436@qq.com".to_string();
-    let smtp_password = "wojkjdfglmtkcifj".to_string();
+    let smtp_password = "".to_string();
     let smtp_server = "smtp.qq.com".to_string();
 
     let message = Message::builder()

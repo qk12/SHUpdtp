@@ -161,7 +161,7 @@ pub async fn update(
 
 #[derive(Deserialize)]
 pub struct LoginBody {
-    username: String,
+    username_or_email: String,
     password: String,
 }
 
@@ -171,12 +171,14 @@ pub async fn login(
     identity: Identity,
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, ServiceError> {
-    let res = web::block(move || user::login(body.username.clone(), body.password.clone(), pool))
-        .await
-        .map_err(|e| {
-            eprintln!("{}", e);
-            e
-        })?;
+    let res = web::block(move || {
+        user::login(body.username_or_email.clone(), body.password.clone(), pool)
+    })
+    .await
+    .map_err(|e| {
+        eprintln!("{}", e);
+        e
+    })?;
 
     let user_string = serde_json::to_string(&res).map_err(|_| ServiceError::InternalServerError)?;
     info!("user_string={}", user_string);

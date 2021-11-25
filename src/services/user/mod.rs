@@ -199,25 +199,37 @@ pub fn get_list(
     })
 }
 
-pub fn login(username: String, password: String, pool: web::Data<Pool>) -> ServiceResult<SlimUser> {
+pub fn login(
+    username_or_email: String,
+    password: String,
+    pool: web::Data<Pool>,
+) -> ServiceResult<SlimUser> {
     let conn = &db_connection(&pool)?;
 
     use crate::schema::users as users_schema;
-    let user: User = users_schema::table
-        .filter(users_schema::username.eq(username))
-        .first(conn)?;
+    let user = match users_schema::table
+        .filter(users_schema::username.eq(username_or_email.clone()))
+        .first::<User>(conn)
+    {
+        Ok(user_by_username) => user_by_username,
+        Err(_) => match users_schema::table
+            .filter(users_schema::email.eq(username_or_email))
+            .first::<User>(conn)
+        {
+            Ok(user_by_email) => user_by_email,
+            Err(_) => {
+                let hint = "用户名或密码错误".to_string();
+                return Err(ServiceError::BadRequest(hint));
+            }
+        },
+    };
 
-    if user.hash.is_none() || user.salt.is_none() {
-        let hint = "Password was not set.".to_string();
-        Err(ServiceError::BadRequest(hint))
+    let hash = encryption::make_hash(&password, &user.clone().salt.unwrap()).to_vec();
+    if Some(hash) == user.hash {
+        Ok(SlimUser::from(user))
     } else {
-        let hash = encryption::make_hash(&password, &user.clone().salt.unwrap()).to_vec();
-        if Some(hash) == user.hash {
-            Ok(SlimUser::from(user))
-        } else {
-            let hint = "Password is wrong.".to_string();
-            Err(ServiceError::BadRequest(hint))
-        }
+        let hint = "用户名或密码错误".to_string();
+        Err(ServiceError::BadRequest(hint))
     }
 }
 
@@ -368,6 +380,7 @@ pub fn get_submissions_time(
     Ok(time_count)
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize)]
 pub struct SmmsProfilePictureData {
     file_id: i32,
@@ -382,6 +395,7 @@ pub struct SmmsProfilePictureData {
     page: String,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize)]
 pub struct SmmsProfilePicture {
     success: bool,
