@@ -5,6 +5,7 @@ use crate::models::problems::*;
 use crate::models::region_links::*;
 use crate::models::regions::*;
 use crate::models::utils::SizedList;
+use crate::statics::RESULT_STATISTICS_CACHE;
 use actix_files::NamedFile;
 use actix_web::web;
 use diesel::prelude::*;
@@ -52,12 +53,10 @@ pub fn insert_problems(
     use crate::schema::problems as problems_schema;
     use crate::schema::region_links as region_links_schema;
 
-    let mut target_id: i32 = region_links_schema::table
-        .select(region_links_schema::inner_id)
+    let mut target_id = region_links_schema::table
         .filter(region_links_schema::region.eq(region.clone()))
-        .order(region_links_schema::inner_id.desc())
-        .first(conn)
-        .unwrap_or(0);
+        .count()
+        .get_result::<i64>(conn)? as i32;
     target_id += 1;
 
     let mut res = Vec::new();
@@ -288,21 +287,52 @@ pub fn delete_problem(region: String, inner_id: i32, pool: web::Data<Pool>) -> S
 
     use crate::schema::region_links as region_links_schema;
 
-    let target = region_links_schema::table.filter(
-        region_links_schema::region
-            .eq(region.clone())
-            .and(region_links_schema::inner_id.eq(inner_id.clone())),
-    );
+    let count = region_links_schema::table
+        .filter(region_links_schema::region.eq(region.clone()))
+        .count()
+        .get_result::<i64>(conn)? as i32;
 
-    let problem_id: i32 = target
-        .clone()
-        .select(region_links_schema::problem_id)
-        .first(conn)?;
+    let deleted_region_link = diesel::delete(
+        region_links_schema::table
+            .filter(region_links_schema::region.eq(region.clone()))
+            .filter(region_links_schema::inner_id.eq(inner_id)),
+    )
+    .get_result::<RegionLink>(conn)?;
 
-    diesel::delete(target).execute(conn)?;
+    if inner_id != count {
+        diesel::update(
+            region_links_schema::table
+                .filter(region_links_schema::region.eq(region.clone()))
+                .filter(region_links_schema::inner_id.eq(count)),
+        )
+        .set(region_links_schema::inner_id.eq(inner_id))
+        .execute(conn)?;
+    }
+
+    let problem_id = deleted_region_link.problem_id;
+
+    use crate::schema::submissions as submissions_schema;
+    diesel::delete(
+        submissions_schema::table
+            .filter(submissions_schema::region.eq(region.clone()))
+            .filter(submissions_schema::problem_id.eq(problem_id)),
+    )
+    .execute(conn)?;
+
+    let has_cache = {
+        let result_statistics = RESULT_STATISTICS_CACHE.read().unwrap();
+        result_statistics
+            .get(&(region.clone(), problem_id))
+            .is_some()
+    };
+
+    if has_cache {
+        let mut result_statistics = RESULT_STATISTICS_CACHE.write().unwrap();
+        result_statistics.remove(&(region.to_owned(), problem_id));
+    }
 
     if region_links_schema::table
-        .filter(region_links_schema::problem_id.eq(problem_id.clone()))
+        .filter(region_links_schema::problem_id.eq(problem_id))
         .count()
         .get_result::<i64>(conn)? as i32
         == 0
@@ -313,16 +343,6 @@ pub fn delete_problem(region: String, inner_id: i32, pool: web::Data<Pool>) -> S
             .execute(conn)
             .expect("Error changing problem's release state.");
     }
-
-    use crate::schema::submissions as submissions_schema;
-    diesel::delete(
-        submissions_schema::table.filter(
-            submissions_schema::region
-                .eq(region.clone())
-                .and(submissions_schema::problem_id.eq(problem_id.clone())),
-        ),
-    )
-    .execute(conn)?;
 
     Ok(())
 }
