@@ -163,13 +163,6 @@ pub fn get_list(
         Vec::<i32>::new()
     };
 
-    log::info!("{}", tag_filter.len());
-    for i in &tag_filter {
-        log::info!("{}", i);
-    }
-
-    //let tag_filter = Vec::<i32>::new();
-
     let (min_difficulty, max_difficulty) = if difficulty_filter.is_none() {
         (0.0, 10.0)
     } else {
@@ -355,7 +348,7 @@ pub fn create(
     let conn = &db_connection(&pool)?;
 
     use crate::schema::problems as problems_schema;
-    diesel::insert_into(problems_schema::table)
+    let inserted_problem = diesel::insert_into(problems_schema::table)
         .values(&InsertableProblem {
             title: title.clone(),
             tags: tags,
@@ -364,14 +357,9 @@ pub fn create(
             settings: serde_json::to_string(&settings).unwrap(),
             is_released: false,
         })
-        .execute(conn)?;
+        .get_result::<RawProblem>(conn)?;
 
-    let problem_id = problems_schema::table
-        .filter(problems_schema::title.eq(title))
-        .select(problems_schema::id)
-        .first::<i32>(conn)?;
-
-    Ok(problem_id)
+    Ok(inserted_problem.id)
 }
 
 pub fn update(
