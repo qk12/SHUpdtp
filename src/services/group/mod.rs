@@ -169,3 +169,17 @@ pub fn get_linked_user_column_list(
         list: res,
     })
 }
+
+pub fn delete_user(id: i32, user_id: i32, pool: web::Data<Pool>) -> ServiceResult<()> {
+    let conn = &db_connection(&pool)?;
+
+    use crate::schema::group_links as group_links_schema;
+    diesel::delete(
+        group_links_schema::table
+            .filter(group_links_schema::group_id.eq(id))
+            .filter(group_links_schema::user_id.eq(user_id)),
+    )
+    .execute(conn)?;
+
+    Ok(())
+}

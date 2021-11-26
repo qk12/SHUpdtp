@@ -11,6 +11,7 @@ pub fn route(cfg: &mut web::ServiceConfig) {
             .service(handler::get)
             .service(handler::get_list)
             .service(handler::insert_users)
+            .service(handler::delete_user)
             .service(handler::get_linked_user_column_list),
     );
 }

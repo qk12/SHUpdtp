@@ -192,3 +192,28 @@ pub async fn get_linked_user_column_list(
 
     Ok(HttpResponse::Ok().json(&res))
 }
+
+#[delete("/{id}/{user_id}")]
+pub async fn delete_user(
+    web::Path((id, user_id)): web::Path<(i32, i32)>,
+    logged_user: LoggedUser,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, ServiceError> {
+    if logged_user.0.is_none() {
+        return Err(ServiceError::Unauthorized);
+    }
+    let cur_user = logged_user.0.unwrap();
+    if cur_user.role != "sup" && cur_user.role != "admin" {
+        let hint = "No permission.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let res = web::block(move || group::delete_user(id, user_id, pool))
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
+
+    Ok(HttpResponse::Ok().json(&res))
+}
