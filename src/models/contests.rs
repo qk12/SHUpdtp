@@ -178,3 +178,42 @@ pub struct ContestForm {
     pub salt: Option<String>,
     pub hash: Option<Vec<u8>>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutContest {
+    pub region: String,
+    pub title: String,
+    pub self_type: String,
+    pub introduction: Option<String>,
+    pub start_time: NaiveDateTime,
+    pub end_time: Option<NaiveDateTime>,
+    pub seal_time: Option<NaiveDateTime>,
+    pub state: String,
+    pub is_registered: bool,
+    pub need_pass: bool,
+    pub settings: ContestSettings,
+    pub problem_count: i32,
+    pub registered_user_count: i32,
+}
+
+impl From<RawContest> for OutContest {
+    fn from(raw: RawContest) -> Self {
+        let contest = Contest::from(raw);
+
+        Self {
+            region: contest.region,
+            title: contest.title,
+            self_type: contest.self_type,
+            introduction: contest.introduction,
+            start_time: contest.start_time,
+            end_time: contest.end_time,
+            seal_time: contest.seal_time,
+            state: contest.state,
+            is_registered: false,
+            need_pass: if contest.hash.is_some() { true } else { false },
+            settings: contest.settings,
+            problem_count: 0,
+            registered_user_count: 0,
+        }
+    }
+}

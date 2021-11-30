@@ -333,7 +333,7 @@ pub fn get(
     region: String,
     user_id: Option<i32>,
     pool: web::Data<Pool>,
-) -> ServiceResult<SlimContest> {
+) -> ServiceResult<OutContest> {
     let conn = &db_connection(&pool)?;
 
     use crate::schema::contests as contests_schema;
@@ -341,15 +341,46 @@ pub fn get(
         .filter(contests_schema::region.eq(region.clone()))
         .first(conn)?;
 
-    let mut res = SlimContest::from(raw_contest);
+    let mut out_contest = OutContest::from(raw_contest);
 
     if let Some(inner_data) = user_id {
-        if region_access::check_acl(conn, inner_data, res.region.clone()).is_ok() {
-            res.is_registered = true;
+        if region_access::check_acl(conn, inner_data, out_contest.region.clone()).is_ok() {
+            out_contest.is_registered = true;
         }
     }
 
-    Ok(res)
+    use crate::schema::region_links as region_links_schema;
+    let problem_count = region_links_schema::table
+        .filter(region_links_schema::region.eq(region.clone()))
+        .count()
+        .get_result::<i64>(conn)? as i32;
+
+    out_contest.problem_count = problem_count;
+
+    use crate::schema::access_control_list as access_control_list_schema;
+    let registered_user_count = if out_contest.self_type == "open_contest" {
+        access_control_list_schema::table
+            .filter(access_control_list_schema::region.eq(region.clone()))
+            .filter(access_control_list_schema::self_type.eq("user"))
+            .count()
+            .get_result::<i64>(conn)? as i32
+    } else {
+        let group_ids = access_control_list_schema::table
+            .filter(access_control_list_schema::region.eq(region))
+            .filter(access_control_list_schema::self_type.eq("group"))
+            .select(access_control_list_schema::id)
+            .load::<i32>(conn)?;
+
+        use crate::schema::group_links as group_links_schema;
+        group_links_schema::table
+            .filter(group_links_schema::group_id.eq(any(group_ids)))
+            .count()
+            .get_result::<i64>(conn)? as i32
+    };
+
+    out_contest.registered_user_count = registered_user_count;
+
+    Ok(out_contest)
 }
 
 pub fn insert_groups(
