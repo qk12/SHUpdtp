@@ -3,10 +3,12 @@ use crate::models::utils::SizedList;
 use crate::models::*;
 use crate::statics::WAITING_QUEUE;
 use actix_web::web;
+use diesel::pg::expression::dsl::any;
 use diesel::prelude::*;
 use server_core::database::{db_connection, Pool};
 use server_core::errors::ServiceResult;
 use server_core::utils::time::get_cur_naive_date_time;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use uuid::Uuid;
@@ -152,13 +154,31 @@ pub fn get_list(
         .order(submissions_schema::submit_time.desc())
         .load(conn)?;
 
-    let mut res = Vec::new();
+    let mut slim_submissions = Vec::new();
+    let mut user_ids = Vec::new();
     for raw_submission in raw_submissions {
-        res.push(submissions::SlimSubmission::from(raw_submission));
+        user_ids.push(raw_submission.user_id);
+        slim_submissions.push(submissions::SlimSubmission::from(raw_submission));
+    }
+
+    use crate::schema::users as users_schema;
+    let users = users_schema::table
+        .filter(users_schema::id.eq(any(user_ids)))
+        .load::<users::User>(conn)?;
+
+    let mut user_name_cache: HashMap<i32, String> = HashMap::new();
+    for user in &users {
+        user_name_cache.insert(user.id, user.username.clone());
+    }
+
+    for slim_submission in &mut slim_submissions {
+        if let Some(username) = user_name_cache.get(&slim_submission.user_id) {
+            slim_submission.username = username.clone();
+        }
     }
 
     Ok(SizedList {
         total: total,
-        list: res,
+        list: slim_submissions,
     })
 }
