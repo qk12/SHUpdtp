@@ -11,10 +11,19 @@ use server_core::errors::ServiceError;
 
 #[post("/batch_create")]
 pub async fn batch_create(
-    //logged_user: LoggedUser,
+    logged_user: LoggedUser,
     mut payload: Multipart,
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, ServiceError> {
+    if logged_user.0.is_none() {
+        return Err(ServiceError::Unauthorized);
+    }
+    let cur_user = logged_user.0.unwrap();
+    if cur_user.role != "sup" && cur_user.role != "admin" {
+        let hint = "No permission.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
     let mut bytes = web::BytesMut::new();
     // iterate over multipart stream
     let mut filename = None;
@@ -94,8 +103,18 @@ pub struct GetProblemListParams {
 #[get("")]
 pub async fn get_list(
     query: QsQuery<GetProblemListParams>,
+    logged_user: LoggedUser,
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, ServiceError> {
+    if logged_user.0.is_none() {
+        return Err(ServiceError::Unauthorized);
+    }
+    let cur_user = logged_user.0.unwrap();
+    if cur_user.role != "sup" && cur_user.role != "admin" {
+        let hint = "No permission.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
     let res = web::block(move || {
         problem::get_list(
             query.id_filter,
