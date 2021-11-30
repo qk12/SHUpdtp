@@ -12,18 +12,24 @@ pub struct RawContest {
     pub end_time: Option<NaiveDateTime>,
     pub seal_time: Option<NaiveDateTime>,
     pub settings: String,
+    pub self_type: String,
+    pub salt: Option<String>,
+    pub hash: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Contest {
     pub region: String,
     pub title: String,
+    pub self_type: String,
     pub introduction: Option<String>,
     pub start_time: NaiveDateTime,
     pub end_time: Option<NaiveDateTime>,
     pub seal_time: Option<NaiveDateTime>,
     pub settings: ContestSettings,
     pub state: String,
+    pub salt: Option<String>,
+    pub hash: Option<Vec<u8>>,
 }
 
 impl From<RawContest> for Contest {
@@ -31,12 +37,15 @@ impl From<RawContest> for Contest {
         let mut res = Self {
             region: raw.region,
             title: raw.title,
+            self_type: raw.self_type,
             introduction: raw.introduction,
             start_time: raw.start_time,
             end_time: raw.end_time,
             seal_time: raw.seal_time,
             settings: serde_json::from_str(&raw.settings).unwrap(),
             state: format!("{}", ContestState::Ended),
+            salt: raw.salt,
+            hash: raw.hash,
         };
         res.state = format!(
             "{}",
@@ -50,6 +59,7 @@ impl From<RawContest> for Contest {
 pub struct SlimContest {
     pub region: String,
     pub title: String,
+    pub self_type: String,
     pub introduction: Option<String>,
     pub start_time: NaiveDateTime,
     pub end_time: Option<NaiveDateTime>,
@@ -67,13 +77,14 @@ impl From<RawContest> for SlimContest {
         Self {
             region: contest.region,
             title: contest.title,
+            self_type: contest.self_type,
             introduction: contest.introduction,
             start_time: contest.start_time,
             end_time: contest.end_time,
             seal_time: contest.seal_time,
             state: contest.state,
             is_registered: false,
-            need_pass: false,
+            need_pass: if contest.hash.is_some() { true } else { false },
             settings: contest.settings,
         }
     }
@@ -163,4 +174,7 @@ pub struct ContestForm {
     pub end_time: Option<NaiveDateTime>,
     pub seal_time: Option<NaiveDateTime>,
     pub settings: Option<String>,
+    pub self_type: Option<String>,
+    pub salt: Option<String>,
+    pub hash: Option<Vec<u8>>,
 }

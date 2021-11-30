@@ -10,7 +10,6 @@ use server_core::errors::ServiceError;
 
 #[derive(Deserialize)]
 pub struct GetRegionListParams {
-    self_type: Option<String>,
     limit: i32,
     offset: i32,
 }
@@ -20,14 +19,12 @@ pub async fn get_list(
     query: web::Query<GetRegionListParams>,
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, ServiceError> {
-    let res = web::block(move || {
-        region::get_list(query.self_type.clone(), query.limit, query.offset, pool)
-    })
-    .await
-    .map_err(|e| {
-        eprintln!("{}", e);
-        e
-    })?;
+    let res = web::block(move || region::get_list(query.limit, query.offset, pool))
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
 
     Ok(HttpResponse::Ok().json(&res))
 }
@@ -44,7 +41,6 @@ pub async fn insert_problems(
     pool: web::Data<Pool>,
     logged_user: LoggedUser,
 ) -> Result<HttpResponse, ServiceError> {
-    info!("{:?}", logged_user.0);
     if logged_user.0.is_none() {
         return Err(ServiceError::Unauthorized);
     }
@@ -180,7 +176,6 @@ pub async fn delete_problem(
     logged_user: LoggedUser,
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, ServiceError> {
-    info!("{:?}", logged_user.0);
     if logged_user.0.is_none() {
         return Err(ServiceError::Unauthorized);
     }

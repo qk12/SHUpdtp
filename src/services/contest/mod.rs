@@ -5,7 +5,6 @@ use crate::models::access_control_list::*;
 use crate::models::contests::*;
 use crate::models::groups::{Group, OutGroup};
 use crate::models::ranks::*;
-use crate::models::region_access_settings::*;
 use crate::models::regions::*;
 use crate::models::utils::SizedList;
 use crate::services::rank::utils::update_acm_rank_cache;
@@ -29,6 +28,7 @@ pub fn create(
     seal_time: Option<NaiveDateTime>,
     settings: ContestSettings,
     password: Option<String>,
+    can_view_testcases: bool,
     user_id: i32,
     pool: web::Data<Pool>,
 ) -> ServiceResult<()> {
@@ -40,23 +40,7 @@ pub fn create(
     diesel::insert_into(regions_schema::table)
         .values(&Region {
             name: region.clone(),
-            self_type: self_type,
-            title: title.clone(),
-            has_access_setting: true,
-            introduction: introduction.clone(),
-        })
-        .execute(conn)?;
-
-    use crate::schema::contests as contests_schema;
-    diesel::insert_into(contests_schema::table)
-        .values(&RawContest {
-            region: region.clone(),
-            title: title,
-            introduction: introduction,
-            start_time: start_time,
-            end_time: end_time,
-            seal_time: seal_time,
-            settings: serde_json::to_string(&settings).unwrap(),
+            can_view_testcases: can_view_testcases,
         })
         .execute(conn)?;
 
@@ -70,10 +54,17 @@ pub fn create(
         }
     };
 
-    use crate::schema::region_access_settings as region_access_settings_schema;
-    diesel::insert_into(region_access_settings_schema::table)
-        .values(&RegionAccessSetting {
+    use crate::schema::contests as contests_schema;
+    diesel::insert_into(contests_schema::table)
+        .values(&RawContest {
             region: region.clone(),
+            title: title,
+            introduction: introduction,
+            start_time: start_time,
+            end_time: end_time,
+            seal_time: seal_time,
+            settings: serde_json::to_string(&settings).unwrap(),
+            self_type: self_type,
             salt: salt,
             hash: hash,
         })
@@ -136,11 +127,6 @@ pub fn get_contest_list(
     for raw_contest in raw_contests {
         let mut t = SlimContest::from(raw_contest);
 
-        let access_setting = region_access::read_access_setting(conn, t.region.clone())?;
-        if access_setting.hash.is_some() {
-            t.need_pass = true;
-        }
-
         if let Some(inner_data) = user_id {
             if region_access::check_acl(conn, inner_data, t.region.clone()).is_ok() {
                 t.is_registered = true;
@@ -187,17 +173,10 @@ pub fn register(
         return Err(ServiceError::BadRequest(hint));
     }
 
-    use crate::schema::region_access_settings as region_access_settings_schema;
-    let region_access_setting: RegionAccessSetting = region_access_settings_schema::table
-        .filter(region_access_settings_schema::region.eq(region.clone()))
-        .first(conn)?;
-
-    if region_access_setting.hash.is_some() {
+    if contest.hash.is_some() {
         if let Some(password) = maybe_password {
-            let hash =
-                encryption::make_hash(&password, &region_access_setting.clone().salt.unwrap())
-                    .to_vec();
-            if Some(hash) != region_access_setting.hash {
+            let hash = encryption::make_hash(&password, &contest.salt.unwrap()).to_vec();
+            if Some(hash) != contest.hash {
                 let hint = "Password is wrong.".to_string();
                 return Err(ServiceError::BadRequest(hint));
             }
@@ -269,25 +248,12 @@ pub fn delete(region: String, pool: web::Data<Pool>) -> ServiceResult<()> {
     let conn = &db_connection(&pool)?;
 
     use crate::schema::regions as regions_schema;
-    diesel::delete(
-        regions_schema::table.filter(
-            regions_schema::name
-                .eq(region.clone())
-                .and(regions_schema::self_type.eq("contest")),
-        ),
-    )
-    .execute(conn)?;
+    diesel::delete(regions_schema::table.filter(regions_schema::name.eq(region.clone())))
+        .execute(conn)?;
 
     use crate::schema::contests as contests_schema;
     diesel::delete(contests_schema::table.filter(contests_schema::region.eq(region.clone())))
         .execute(conn)?;
-
-    use crate::schema::region_access_settings as region_access_settings_schema;
-    diesel::delete(
-        region_access_settings_schema::table
-            .filter(region_access_settings_schema::region.eq(region.clone())),
-    )
-    .execute(conn)?;
 
     use crate::schema::access_control_list as access_control_list_schema;
     diesel::delete(
@@ -315,22 +281,31 @@ pub fn update(
     new_end_time: Option<NaiveDateTime>,
     new_seal_time: Option<NaiveDateTime>,
     new_settings: Option<ContestSettings>,
+    new_self_type: Option<String>,
     new_password: Option<String>,
+    new_can_view_testcases: Option<bool>,
     pool: web::Data<Pool>,
 ) -> ServiceResult<()> {
     let conn = &db_connection(&pool)?;
+
+    use crate::schema::regions as regions_schema;
+    diesel::update(regions_schema::table.filter(regions_schema::name.eq(region.clone())))
+        .set(RegionForm {
+            can_view_testcases: new_can_view_testcases,
+        })
+        .execute(conn)?;
 
     if let Some(settings) = new_settings.clone() {
         utils::check_settings_legal(settings)?;
     }
 
-    use crate::schema::regions as regions_schema;
-    diesel::update(regions_schema::table.filter(regions_schema::name.eq(region.clone())))
-        .set(RegionForm {
-            title: new_title.clone(),
-            introduction: new_introduction.clone(),
-        })
-        .execute(conn)?;
+    let (new_salt, new_hash) = if let Some(inner_data) = new_password {
+        let salt = encryption::make_salt();
+        let hash = encryption::make_hash(&inner_data, &salt).to_vec();
+        (Some(salt), Some(hash))
+    } else {
+        (None, None)
+    };
 
     use crate::schema::contests as contests_schema;
     diesel::update(contests_schema::table.filter(contests_schema::region.eq(region.clone())))
@@ -345,29 +320,11 @@ pub fn update(
             } else {
                 None
             },
+            self_type: new_self_type,
+            salt: new_salt,
+            hash: new_hash,
         })
         .execute(conn)?;
-
-    use crate::schema::region_access_settings as region_access_settings_schema;
-    if let Some(inner_data) = new_password {
-        let (salt, hash) = if inner_data.eq("") {
-            (None, None)
-        } else {
-            let salt = encryption::make_salt();
-            let hash = encryption::make_hash(&inner_data, &salt).to_vec();
-            (Some(salt), Some(hash))
-        };
-
-        diesel::update(
-            region_access_settings_schema::table
-                .filter(region_access_settings_schema::region.eq(region.clone())),
-        )
-        .set((
-            region_access_settings_schema::salt.eq(salt),
-            region_access_settings_schema::hash.eq(hash),
-        ))
-        .execute(conn)?;
-    }
 
     Ok(())
 }
@@ -381,15 +338,10 @@ pub fn get(
 
     use crate::schema::contests as contests_schema;
     let raw_contest: RawContest = contests_schema::table
-        .filter(contests_schema::region.eq(region))
+        .filter(contests_schema::region.eq(region.clone()))
         .first(conn)?;
 
     let mut res = SlimContest::from(raw_contest);
-
-    let access_setting = region_access::read_access_setting(conn, res.region.clone())?;
-    if access_setting.hash.is_some() {
-        res.need_pass = true;
-    }
 
     if let Some(inner_data) = user_id {
         if region_access::check_acl(conn, inner_data, res.region.clone()).is_ok() {
@@ -407,10 +359,10 @@ pub fn insert_groups(
 ) -> ServiceResult<()> {
     let conn = &db_connection(&pool)?;
 
-    use crate::schema::regions as regions_schema;
-    let contest_type = regions_schema::table
-        .filter(regions_schema::name.eq(region.clone()))
-        .select(regions_schema::self_type)
+    use crate::schema::contests as contests_schema;
+    let contest_type = contests_schema::table
+        .filter(contests_schema::region.eq(region.clone()))
+        .select(contests_schema::self_type)
         .first::<String>(conn)?;
 
     if contest_type != "group_contest" {
@@ -458,4 +410,30 @@ pub fn get_linked_groups(region: String, pool: web::Data<Pool>) -> ServiceResult
     }
 
     Ok(out_groups)
+}
+
+pub fn delete_group(region: String, group_id: i32, pool: web::Data<Pool>) -> ServiceResult<()> {
+    let conn = &db_connection(&pool)?;
+
+    use crate::schema::contests as contests_schema;
+    let contest_type = contests_schema::table
+        .filter(contests_schema::region.eq(region.clone()))
+        .select(contests_schema::self_type)
+        .first::<String>(conn)?;
+
+    if contest_type != "group_contest" {
+        let hint = "比赛类型不为小组赛.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    use crate::schema::access_control_list as access_control_list_schema;
+    diesel::delete(
+        access_control_list_schema::table
+            .filter(access_control_list_schema::region.eq(region))
+            .filter(access_control_list_schema::self_type.eq("group"))
+            .filter(access_control_list_schema::id.eq(group_id)),
+    )
+    .execute(conn)?;
+
+    Ok(())
 }

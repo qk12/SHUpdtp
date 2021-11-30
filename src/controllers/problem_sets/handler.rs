@@ -9,6 +9,7 @@ pub struct CreateProblemSetBody {
     region: String,
     title: String,
     introduction: Option<String>,
+    can_view_testcases: bool,
 }
 
 #[post("")]
@@ -17,7 +18,6 @@ pub async fn create(
     pool: web::Data<Pool>,
     logged_user: LoggedUser,
 ) -> Result<HttpResponse, ServiceError> {
-    info!("{:?}", logged_user.0);
     if logged_user.0.is_none() {
         return Err(ServiceError::Unauthorized);
     }
@@ -32,6 +32,7 @@ pub async fn create(
             body.region.clone(),
             body.title.clone(),
             body.introduction.clone(),
+            body.can_view_testcases,
             pool,
         )
     })
@@ -97,6 +98,7 @@ pub async fn delete(
 pub struct UpdateProblemSetBody {
     new_title: Option<String>,
     new_introduction: Option<String>,
+    new_can_view_testcases: Option<bool>,
 }
 
 #[put("/{region}")]
@@ -106,7 +108,6 @@ pub async fn update(
     pool: web::Data<Pool>,
     logged_user: LoggedUser,
 ) -> Result<HttpResponse, ServiceError> {
-    info!("{:?}", logged_user.0);
     if logged_user.0.is_none() {
         return Err(ServiceError::Unauthorized);
     }
@@ -121,6 +122,7 @@ pub async fn update(
             region.clone(),
             body.new_title.clone(),
             body.new_introduction.clone(),
+            body.new_can_view_testcases,
             pool,
         )
     })

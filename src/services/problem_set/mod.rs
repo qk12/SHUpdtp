@@ -12,6 +12,7 @@ pub fn create(
     region: String,
     title: String,
     introduction: Option<String>,
+    can_view_testcases: bool,
     pool: web::Data<Pool>,
 ) -> ServiceResult<()> {
     let conn = &db_connection(&pool)?;
@@ -20,10 +21,7 @@ pub fn create(
     diesel::insert_into(regions_schema::table)
         .values(&Region {
             name: region.clone(),
-            self_type: "problem_set".to_owned(),
-            title: title.clone(),
-            has_access_setting: false,
-            introduction: introduction.clone(),
+            can_view_testcases: can_view_testcases,
         })
         .execute(conn)?;
 
@@ -78,25 +76,12 @@ pub fn delete(region: String, pool: web::Data<Pool>) -> ServiceResult<()> {
     let conn = &db_connection(&pool)?;
 
     use crate::schema::regions as regions_schema;
-    diesel::delete(
-        regions_schema::table.filter(
-            regions_schema::name
-                .eq(region.clone())
-                .and(regions_schema::self_type.eq("problem_set")),
-        ),
-    )
-    .execute(conn)?;
+    diesel::delete(regions_schema::table.filter(regions_schema::name.eq(region.clone())))
+        .execute(conn)?;
 
     use crate::schema::problem_sets as problem_sets_schema;
     diesel::delete(
         problem_sets_schema::table.filter(problem_sets_schema::region.eq(region.clone())),
-    )
-    .execute(conn)?;
-
-    use crate::schema::region_access_settings as region_access_settings_schema;
-    diesel::delete(
-        region_access_settings_schema::table
-            .filter(region_access_settings_schema::region.eq(region.clone())),
     )
     .execute(conn)?;
 
@@ -113,6 +98,7 @@ pub fn update(
     region: String,
     new_title: Option<String>,
     new_introduction: Option<String>,
+    new_can_view_testcases: Option<bool>,
     pool: web::Data<Pool>,
 ) -> ServiceResult<()> {
     let conn = &db_connection(&pool)?;
@@ -120,8 +106,7 @@ pub fn update(
     use crate::schema::regions as regions_schema;
     diesel::update(regions_schema::table.filter(regions_schema::name.eq(region.clone())))
         .set(RegionForm {
-            title: new_title.clone(),
-            introduction: new_introduction.clone(),
+            can_view_testcases: new_can_view_testcases,
         })
         .execute(conn)?;
 

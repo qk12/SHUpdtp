@@ -9,7 +9,6 @@ pub mod problem_sets;
 pub mod problem_tags;
 pub mod problems;
 pub mod ranks;
-pub mod region_access_settings;
 pub mod region_links;
 pub mod regions;
 pub mod samples;

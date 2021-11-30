@@ -13,6 +13,7 @@ pub fn route(cfg: &mut web::ServiceConfig) {
             .service(handler::update)
             .service(handler::get)
             .service(handler::insert_groups)
-            .service(handler::get_linked_groups),
+            .service(handler::get_linked_groups)
+            .service(handler::delete_group),
     );
 }

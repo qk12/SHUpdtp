@@ -28,6 +28,9 @@ table! {
         end_time -> Nullable<Timestamp>,
         seal_time -> Nullable<Timestamp>,
         settings -> Text,
+        self_type -> Text,
+        salt -> Nullable<Varchar>,
+        hash -> Nullable<Bytea>,
     }
 }
 
@@ -74,14 +77,6 @@ table! {
 }
 
 table! {
-    region_access_settings (region) {
-        region -> Text,
-        salt -> Nullable<Varchar>,
-        hash -> Nullable<Bytea>,
-    }
-}
-
-table! {
     region_links (inner_id, region) {
         region -> Text,
         inner_id -> Int4,
@@ -91,12 +86,9 @@ table! {
 }
 
 table! {
-    regions (name, self_type) {
+    regions (name) {
         name -> Text,
-        self_type -> Text,
-        title -> Text,
-        has_access_setting -> Bool,
-        introduction -> Nullable<Text>,
+        can_view_testcases -> Bool,
     }
 }
 
@@ -153,7 +145,6 @@ allow_tables_to_appear_in_same_query!(
     problem_sets,
     problem_tags,
     problems,
-    region_access_settings,
     region_links,
     regions,
     samples,

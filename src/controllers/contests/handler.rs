@@ -18,6 +18,7 @@ pub struct CreateContestBody {
     seal_time: Option<NaiveDateTime>,
     settings: Option<ContestSettings>,
     password: Option<String>,
+    can_view_testcases: bool,
 }
 
 #[post("")]
@@ -26,7 +27,6 @@ pub async fn create(
     pool: web::Data<Pool>,
     logged_user: LoggedUser,
 ) -> Result<HttpResponse, ServiceError> {
-    info!("{:?}", logged_user.0);
     if logged_user.0.is_none() {
         return Err(ServiceError::Unauthorized);
     }
@@ -51,6 +51,7 @@ pub async fn create(
                 ContestSettings::default()
             },
             body.password.clone(),
+            body.can_view_testcases,
             cur_user.id,
             pool,
         )
@@ -113,7 +114,6 @@ pub async fn register(
     pool: web::Data<Pool>,
     logged_user: LoggedUser,
 ) -> Result<HttpResponse, ServiceError> {
-    info!("{:?}", logged_user.0);
     if logged_user.0.is_none() {
         return Err(ServiceError::Unauthorized);
     }
@@ -186,7 +186,9 @@ pub struct UpdateContestBody {
     new_end_time: Option<NaiveDateTime>,
     new_seal_time: Option<NaiveDateTime>,
     new_settings: Option<ContestSettings>,
+    new_self_type: Option<String>,
     new_password: Option<String>,
+    new_can_view_testcases: Option<bool>,
 }
 
 #[put("/{region}")]
@@ -196,7 +198,6 @@ pub async fn update(
     pool: web::Data<Pool>,
     logged_user: LoggedUser,
 ) -> Result<HttpResponse, ServiceError> {
-    info!("{:?}", logged_user.0);
     if logged_user.0.is_none() {
         return Err(ServiceError::Unauthorized);
     }
@@ -215,7 +216,9 @@ pub async fn update(
             body.new_end_time.clone(),
             body.new_seal_time.clone(),
             body.new_settings.clone(),
+            body.new_self_type.clone(),
             body.new_password.clone(),
+            body.new_can_view_testcases,
             pool,
         )
     })
@@ -259,7 +262,7 @@ pub struct InsertGroupIntoContestBody {
     group_ids: Vec<i32>,
 }
 
-#[post("/{region}")]
+#[post("/{region}/group")]
 pub async fn insert_groups(
     web::Path(region): web::Path<String>,
     body: web::Json<InsertGroupIntoContestBody>,
@@ -285,7 +288,7 @@ pub async fn insert_groups(
     Ok(HttpResponse::Ok().json(&res))
 }
 
-#[get("/{region}/groups")]
+#[get("/{region}/group")]
 pub async fn get_linked_groups(
     web::Path(region): web::Path<String>,
     logged_user: LoggedUser,
@@ -301,6 +304,31 @@ pub async fn get_linked_groups(
     }
 
     let res = web::block(move || contest::get_linked_groups(region, pool))
+        .await
+        .map_err(|e| {
+            eprintln!("{}", e);
+            e
+        })?;
+
+    Ok(HttpResponse::Ok().json(&res))
+}
+
+#[delete("/{region}/group/{group_id}")]
+pub async fn delete_group(
+    web::Path((region, group_id)): web::Path<(String, i32)>,
+    logged_user: LoggedUser,
+    pool: web::Data<Pool>,
+) -> Result<HttpResponse, ServiceError> {
+    if logged_user.0.is_none() {
+        return Err(ServiceError::Unauthorized);
+    }
+    let cur_user = logged_user.0.unwrap();
+    if cur_user.role != "sup" && cur_user.role != "admin" {
+        let hint = "No permission.".to_string();
+        return Err(ServiceError::BadRequest(hint));
+    }
+
+    let res = web::block(move || contest::delete_group(region, group_id, pool))
         .await
         .map_err(|e| {
             eprintln!("{}", e);
