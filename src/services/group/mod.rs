@@ -2,8 +2,10 @@ pub mod utils;
 
 use crate::models::group_links::*;
 use crate::models::groups::*;
+use crate::models::users::{OutUser, User};
 use crate::models::utils::SizedList;
 use actix_web::web;
+use diesel::pg::expression::dsl::any;
 use diesel::prelude::*;
 use server_core::database::{db_connection, Pool};
 use server_core::errors::ServiceResult;
@@ -146,7 +148,7 @@ pub fn get_linked_user_column_list(
     limit: i32,
     offset: i32,
     pool: web::Data<Pool>,
-) -> ServiceResult<SizedList<i32>> {
+) -> ServiceResult<SizedList<OutUser>> {
     let conn = &db_connection(&pool)?;
 
     use crate::schema::group_links as group_links_schema;
@@ -154,19 +156,25 @@ pub fn get_linked_user_column_list(
 
     let total: i64 = target.clone().count().get_result(conn)?;
 
-    let group_links = target
+    let user_ids = target
+        .select(group_links_schema::user_id)
         .offset(offset.into())
         .limit(limit.into())
-        .load::<GroupLink>(conn)?;
+        .load::<i32>(conn)?;
 
-    let mut res = Vec::new();
-    for group_link in group_links {
-        res.push(group_link.user_id);
+    use crate::schema::users as users_schema;
+    let users = users_schema::table
+        .filter(users_schema::id.eq(any(user_ids)))
+        .load::<User>(conn)?;
+
+    let mut out_users = Vec::new();
+    for user in users {
+        out_users.push(OutUser::from(user));
     }
 
     Ok(SizedList {
         total: total,
-        list: res,
+        list: out_users,
     })
 }
 
