@@ -58,8 +58,19 @@ pub struct CreateUserBody {
 #[post("")]
 pub async fn create(
     body: web::Json<CreateUserBody>,
+    logged_user: LoggedUser,
     pool: web::Data<Pool>,
 ) -> Result<HttpResponse, ServiceError> {
+    if body.role == "sup" || body.role == "admin" {
+        if logged_user.0.is_none() {
+            return Err(ServiceError::Unauthorized);
+        }
+        if logged_user.0.unwrap().role != "sup" {
+            let hint = "No permission.".to_string();
+            return Err(ServiceError::BadRequest(hint));
+        }
+    }
+
     let res = web::block(move || {
         user::create(
             body.username.clone(),
@@ -134,6 +145,15 @@ pub async fn update(
     if cur_user.id != id && cur_user.role != "sup" && cur_user.role != "admin" {
         let hint = "No permission.".to_string();
         return Err(ServiceError::BadRequest(hint));
+    }
+
+    if let Some(role) = &body.new_role {
+        if role == "sup" || role == "admin" {
+            if cur_user.role != "sup" {
+                let hint = "No permission.".to_string();
+                return Err(ServiceError::BadRequest(hint));
+            }
+        }
     }
 
     let res = web::block(move || {
@@ -236,7 +256,7 @@ pub async fn delete(
         return Err(ServiceError::Unauthorized);
     }
     let cur_user = logged_user.0.unwrap();
-    if cur_user.id != id && cur_user.role != "sup" && cur_user.role != "admin" {
+    if cur_user.role != "sup" && cur_user.role != "admin" {
         let hint = "No permission.".to_string();
         return Err(ServiceError::BadRequest(hint));
     }

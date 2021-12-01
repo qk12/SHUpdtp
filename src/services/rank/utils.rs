@@ -36,6 +36,8 @@ pub fn update_acm_rank_cache(
 
     let access_control_list: Vec<AccessControlListColumn> = access_control_list_schema::table
         .filter(access_control_list_schema::region.eq(region.clone()))
+        .filter(access_control_list_schema::self_type.eq("user"))
+        .filter(access_control_list_schema::is_manager.eq(false))
         .load(conn)?;
 
     for access_control_list_colunm in access_control_list {
@@ -100,15 +102,16 @@ fn build_acm_rank_column(
     let is_unrated = access_control_list_column.is_unrated;
 
     use crate::schema::users as users_schema;
-    let account = users_schema::table
+    let (username, real_name) = users_schema::table
         .filter(users_schema::id.eq(user_id))
-        .select(users_schema::username)
-        .first::<String>(conn)?;
+        .select((users_schema::username, users_schema::real_name))
+        .first::<(String, Option<String>)>(conn)?;
 
     let mut rank_column = ACMRankColumn {
         rank: None,
         user_id,
-        account,
+        username,
+        real_name,
         total_accepted: 0,
         time_cost: 0,
         is_unrated,

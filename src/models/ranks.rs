@@ -11,8 +11,8 @@ pub struct ACMRank {
 pub struct ACMRankColumn {
     pub rank: Option<i32>,
     pub user_id: i32,
-    //temporary use account to show username
-    pub account: String,
+    pub username: String,
+    pub real_name: Option<String>,
     pub total_accepted: i32,
     pub time_cost: i64,
     pub is_unrated: Option<bool>,

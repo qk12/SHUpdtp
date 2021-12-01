@@ -2,8 +2,8 @@ use super::statistics::*;
 use super::utils::*;
 use super::JudgeActor;
 use crate::models::*;
-use crate::services::rank::utils::update_acm_rank_cache;
-use crate::services::region::utils::get_self_type;
+//use crate::services::rank::utils::update_acm_rank_cache;
+//use crate::services::region::utils::get_self_type;
 use crate::statics::JUDGE_SERVER_INFOS;
 use crate::statics::WAITING_QUEUE;
 use actix::prelude::*;
@@ -35,7 +35,7 @@ impl Handler<StartJudge> for JudgeActor {
             let lock = WAITING_QUEUE.read().unwrap();
             lock.len()
         };
-        log::info!("queue_size: {}", queue_size);
+        // log::info!("queue_size: {}", queue_size);
         while queue_size != 0 {
             let server = choose_judge_server();
             if server.is_none() {
@@ -185,7 +185,7 @@ impl Handler<StartJudge> for JudgeActor {
                         return;
                     }
                 };
-
+                /*
                 if let Some(region) = submission.region.clone() {
                     if match get_self_type(region, &conn) {
                         Ok(region_type) => region_type,
@@ -203,7 +203,7 @@ impl Handler<StartJudge> for JudgeActor {
                             }
                         };
                     }
-                }
+                }*/
             }
 
             queue_size = {

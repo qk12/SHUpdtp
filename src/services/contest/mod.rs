@@ -220,9 +220,13 @@ pub fn get_acm_rank(region: String, pool: web::Data<Pool>) -> ServiceResult<ACMR
     let need_update = {
         let rank_cache = ACM_RANK_CACHE.read().unwrap();
 
-        // not been refreshed in a minute
+        // not been refreshed after ended and in a minute
         if let Some(rank) = rank_cache.get(&region) {
-            if get_cur_naive_date_time().timestamp() - rank.last_updated_time.timestamp() > 60 {
+            if contest.end_time.is_some() && rank.last_updated_time > contest.end_time.unwrap() {
+                false
+            } else if get_cur_naive_date_time().timestamp() - rank.last_updated_time.timestamp()
+                > 60
+            {
                 true
             } else {
                 false
@@ -288,12 +292,14 @@ pub fn update(
 ) -> ServiceResult<()> {
     let conn = &db_connection(&pool)?;
 
-    use crate::schema::regions as regions_schema;
-    diesel::update(regions_schema::table.filter(regions_schema::name.eq(region.clone())))
-        .set(RegionForm {
-            can_view_testcases: new_can_view_testcases,
-        })
-        .execute(conn)?;
+    if new_can_view_testcases.is_some() {
+        use crate::schema::regions as regions_schema;
+        diesel::update(regions_schema::table.filter(regions_schema::name.eq(region.clone())))
+            .set(RegionForm {
+                can_view_testcases: new_can_view_testcases,
+            })
+            .execute(conn)?;
+    }
 
     if let Some(settings) = new_settings.clone() {
         utils::check_settings_legal(settings)?;
